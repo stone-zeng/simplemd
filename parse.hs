@@ -16,44 +16,58 @@ main = let f = foldl parseMarkdown $ Markdown []
         , "}"
         , "```"
       ]
+    -- , [
+    --       "```python"
+    --     , "def f:"
+    --     , "\tpass"
+    --     , "```endpython"
+    --     , "```"
+    --   ]
+    -- , [
+    --       "```python"
+    --     , "def f:"
+    --     , "\tpass"
+    --     , "```"
+    --     , "something after"
+    --     , "more thing after"
+    --   ]
+    -- , [
+    --       "# Title"
+    --     , "```python"
+    --     , "# Comment"
+    --     , "def f:"
+    --     , "\tpass"
+    --     , "```"
+    --     , "something after"
+    --     , "## title2"
+    --   ]
+    -- , ["Word1", "Word2", "Word3"]
+    -- , ["text", "text", "- list1", "- list2", "  - indent", "- item next", "text3"]
     , [
-          "```python"
-        , "def f:"
-        , "\tpass"
-        , "```endpython"
-        , "```"
+        "Text"
+      , "- ul1"
+      , "- ul2"
+      , "- ul3"
+      , "1. ol1"
+      , "2. ol2"
+      , "1. ol3"
+      , "- ul another"
+      , "3. ol another"
       ]
-    , [
-          "```python"
-        , "def f:"
-        , "\tpass"
-        , "```"
-        , "something after"
-      ]
-    , [
-          "# Title"
-        , "```python"
-        , "# Comment"
-        , "def f:"
-        , "\tpass"
-        , "```"
-        , "something after"
-        , "## title2"
-      ]
-    , [
-          "## Title"
-        , "# Title2"
-        , "```c"
-        , "- help"
-        , "1. First"
-        , "22. Twenty-two"
-        , "1.invalie ol"
-        , "-invalid ul"
-        , "> quote"
-        , ">> invalid quote"
-        , ">2invalid quote"
-        , "``invalid code"
-      ]
+    -- , [
+    --       "## Title"
+    --     , "# Title2"
+    --     , "```c"
+    --     , "- help"
+    --     , "1. First"
+    --     , "22. Twenty-two"
+    --     , "1.invalie ol"
+    --     , "-invalid ul"
+    --     , "> quote"
+    --     , ">> invalid quote"
+    --     , ">2invalid quote"
+    --     , "``invalid code"
+    --   ]
   ]
 
 --------------------------------------------------------------------------------
@@ -97,14 +111,8 @@ data Pre = Pre {
   , preContent :: String
   } deriving (Show)
 
--- HTML <ul>
-newtype Ulist = Ulist [ListItem] deriving (Show)
-
--- HTML <ol>
-data Olist = Olist {
-    olStart   :: Int
-  , olContent :: [ListItem]
-  } deriving (Show)
+class HtmlList a where
+  addItem :: a -> ListItem -> a
 
 -- HTML <li>
 data ListItem = ListInlineItem [InlineElem]
@@ -115,10 +123,32 @@ data ListBlockElem = ListBlockPara  Para
                    | ListBlockOlist Olist
   deriving (Show)
 
+-- HTML <ul>
+newtype Ulist = Ulist [ListItem] deriving (Show)
+instance HtmlList Ulist where
+  addItem (Ulist ulist) x = Ulist $ ulist ++ [x]
+
+-- HTML <ol>
+data Olist = Olist {
+    olStart   :: Int
+  , olContent :: [ListItem]
+  } deriving (Show)
+instance HtmlList Olist where
+  addItem olist x = Olist {
+    olStart   = olStart olist
+  , olContent = olContent olist ++ [x]
+  }
+
 -- HTML <blockquote>
 newtype Quote = Quote [BlockElem] deriving (Show)
 
 newtype Markdown = Markdown [BlockElem] deriving (Show)
+
+(<+>) :: Markdown -> Markdown -> Markdown
+Markdown list1 <+> Markdown list2 = Markdown (list1 ++ list2)
+
+(<:>) :: [BlockElem] -> Markdown -> Markdown
+list1 <:> Markdown list2 = Markdown (list1 ++ list2)
 
 --------------------------------------------------------------------------------
 
@@ -177,18 +207,49 @@ parseMarkdown (Markdown mdElements) s =
       case s of
         "```" -> Markdown $ init mdElements ++ [BlockPre pre Closed]
         _     -> Markdown $ init mdElements ++ [BlockPre newPre Open]
-        where newPre = Pre {
-          preLang    = preLang pre
-        , preContent = preContent pre ++ "\n" ++ s
-        }
+          where newPre = Pre {
+            preLang    = preLang pre
+          , preContent = preContent pre ++ "\n" ++ s
+          }
     BlockPara para Open ->
       case s of
         "" -> Markdown $ init mdElements ++ [BlockPara para Closed]
         _  ->
-          Markdown $ mdElements ++ newMdElems
-            where Markdown newMdElems = parseMarkdown (Markdown []) s
+          case matchRegex headingPattern s of
+            Just result -> mdElements <:> parseHeading result
+            Nothing ->
+              case matchRegex prePattern s of
+                Just result -> mdElements <:> parsePre result
+                Nothing ->
+                  case matchRegex ulistPattern s of
+                    Just result -> mdElements <:> parseUlist result
+                    Nothing ->
+                      case matchRegex olistPattern s of
+                        Just result -> mdElements <:> parseOlist result
+                        Nothing ->
+                          case matchRegex quotePattern s of
+                            Just result -> parseQuote result
+                            Nothing ->
+                              Markdown $ init mdElements ++
+                                [BlockPara (Para $ items ++ parseInline s) Open]
+                              where Para items = para
+    BlockUlist ulist Open ->
+      case s of
+        "" -> Markdown $ init mdElements ++ [BlockUlist ulist Closed]
+        _  ->
+          -- TODO: indent
+          case matchRegex ulistPattern s of
+            Just result -> init mdElements <:> Markdown [BlockUlist ul Open]
+              where ul = ulist `addItem` (ListInlineItem $ parseInline $ last result)
+            Nothing -> mdElements <:> parseMarkdown (Markdown []) s
+    BlockOlist olist Open ->
+      case s of
+        "" -> Markdown $ init mdElements ++ [BlockOlist olist Closed]
+        _  ->
+          -- TODO: indent
+          case matchRegex olistPattern s of
+            Just result -> init mdElements <:> Markdown [BlockOlist ol Open]
+              where ol = olist `addItem` (ListInlineItem $ parseInline $ last result)
+            Nothing -> mdElements <:> parseMarkdown (Markdown []) s
     _ ->
-      -- BlockPre _ Closed
-      -- BlockHeading _ Closed
-      Markdown $ mdElements ++ newMdElems
-        where Markdown newMdElems = parseMarkdown (Markdown []) s
+      mdElements <:> parseMarkdown (Markdown []) s

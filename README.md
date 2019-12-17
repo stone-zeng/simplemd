@@ -5,8 +5,8 @@
 - Block elements
   - [x] Headers
   - [ ] Blockquotes
-  - [ ] Ordered list
-  - [ ] Unordered list
+  - [x] Ordered list
+  - [x] Unordered list
   - [x] Code blocks
   - [ ] Horizontal rules
 - Inline elements
