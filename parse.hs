@@ -31,51 +31,65 @@ parseString result x = "(" ++ result ++ "+" ++ show x ++ ")"
 --------------------------------------------------------------------------------
 
 
-data ElemType = Plain | Code | Emph | Strong | Link String | Math
+data ElemType = Plain
+              | Code      -- ^ HTML <code>
+              | Emph      -- ^ HTML <em>
+              | Strong    -- ^ HTML <strong>
+              | Link Url  -- ^ HTML <a href="...">
+              | Math      -- ^ Use MathJax/KaTeX
     deriving (Show)
+type Url = String
 
 data InlineElem = InlineElem {
         elemType    :: ElemType,
         elemContent :: String
     } deriving (Show)
 
+data BlockElem = BlockPara    Para     -- ^ HTML <p>
+               | BlockHeading Heading  -- ^ HTML <h1>, <h2>, ... <h6>
+               | BlockPre     Pre      -- ^ HTML <pre>
+               | BlockUlist   Ulist    -- ^ HTML <ul>
+               | BlockOlist   Olist    -- ^ HTML <ol>
+               | BlockQuote   Quote    -- ^ HTML <blockquote>
+    deriving (Show)
+
+-- HTML <p>
 newtype Para = Para [InlineElem] deriving (Show)
 
+-- HTML <h1>, <h2>, ... <h6>
 data Heading = Heading {
         headingLevel   :: Int,
         headingContent :: [InlineElem]
     } deriving (Show)
 
+-- HTML <pre>
 data Pre = Pre {
         preLang    :: String,
         preContent :: String
     } deriving (Show)
 
+-- HTML <ul>
 newtype Ulist = Ulist [ListItem] deriving (Show)
+
+-- HTML <ol>
 data Olist = Olist {
         olStart   :: Int,
         olContent :: [ListItem]
     } deriving (Show)
-newtype ListItem = ListItem [InlineElem] deriving (Show)
 
-newtype Quote = Quote [QuoteElem]
+-- HTML <li>
+data ListItem = ListInlineItem [InlineElem]
+              | ListBlockItem  [ListBlockElem]
     deriving (Show)
-data QuoteElem  = QuotePara    Para
-                | QuoteHeading Heading
-                | QuotePre     Pre
-                | QuoteUlist   Ulist
-                | QuoteOlist   Olist
-                | QuoteQuote   Quote
+data ListBlockElem = ListBlockPara  Para
+                   | ListBlockUlist Ulist
+                   | ListBlockOlist Olist
     deriving (Show)
 
-newtype Markdown = Markdown [MdElem] deriving (Show)
-data MdElem = MdPara    Para
-            | MdHeading Heading
-            | MdPre     Pre
-            | MdUlist   Ulist
-            | MdOlist   Olist
-            | MdQuote   Quote
-    deriving (Show)
+-- HTML <blockquote>
+newtype Quote = Quote [BlockElem] deriving (Show)
+
+newtype Markdown = Markdown [BlockElem] deriving (Show)
 
 --------------------------------------------------------------------------------
 
@@ -87,25 +101,25 @@ olistPattern   = mkRegex "^([0-9]+)\\. (.*)"    -- [<number>, <content>]
 quotePattern   = mkRegex "^> (.*)"              -- [<content>]
 
 parseHeading, parsePre, parseUlist, parseOlist, parseQuote :: [String] -> Markdown
-parseHeading result = Markdown [MdHeading heading]
+parseHeading result = Markdown [BlockHeading heading]
     where heading = Heading {
         headingLevel   = length $ head result,
         headingContent = parseInline $ last result
     }
-parsePre result = Markdown [MdPre pre]
+parsePre result = Markdown [BlockPre pre]
     where pre = Pre {
         preLang    = head result,
         preContent = ""
     }
-parseUlist result = Markdown [MdUlist ul]
-    where ul = Ulist [ListItem $ parseInline $ last result]
-parseOlist result = Markdown [MdOlist ol]
+parseUlist result = Markdown [BlockUlist ul]
+    where ul = Ulist [ListInlineItem $ parseInline $ last result]
+parseOlist result = Markdown [BlockOlist ol]
     where ol = Olist {
         olStart   = read $ head result,
-        olContent = [ListItem $ parseInline $ last result]
+        olContent = [ListInlineItem $ parseInline $ last result]
     }
-parseQuote result = Markdown [MdQuote quote]
-    where quote = Quote [QuotePara $ Para $ parseInline $ head result]
+parseQuote result = Markdown [BlockQuote quote]
+    where quote = Quote [BlockPara $ Para $ parseInline $ head result]
 
 parseInline :: String -> [InlineElem]
 parseInline s = [InlineElem {elemType = Plain, elemContent = s}]
@@ -126,51 +140,8 @@ parseMarkdown (Markdown []) s =
                                 Nothing ->
                                     case matchRegex quotePattern s of
                                         Just result -> parseQuote result
-                                        Nothing -> Markdown [MdPara $ Para $ parseInline s]
+                                        Nothing -> Markdown [BlockPara $ Para $ parseInline s]
 
 parseMarkdown (Markdown mdElements) s =
     Markdown (mdElements ++ newMdElems)
     where Markdown newMdElems = parseMarkdown (Markdown []) s
-
-
---------------------------------------------------------------------------------
-
-{-
-
-parseHeaders :: String -> String
-parseHeaders s = unwrap $ matchRegexAll pattern s
-    where
-        pattern = mkRegex "^ {0,3}(#{1,6}) +"
-
-        unwrap Nothing = s
-        unwrap (Just (_, _, _title, hashes)) = tag hx $ trimSpaces _title
-            where
-                hx = "h" ++ (show $ length $ head hashes)
-
-parseHeaders_test :: IO ()
-parseHeaders_test = mapM_ (print . parseHeaders) [
-        -- Valid headers
-        "# foo",
-        "## foo",
-        "### foo",
-        "#### foo",
-        "##### foo",
-        "###### foo",
-        "####### foo",
-        " ### foo",
-        "  ## foo",
-        "   # foo",
-        -- Invalid headers
-        "#5 bolt",
-        "#hashtag",
-        "    # foo   "
-    ]
-
-
-trimSpaces :: String -> String
-trimSpaces = Text.unpack . Text.strip . Text.pack
-
-tag :: String -> String -> String
-tag name content = "<" ++ name ++ ">" ++ content ++ "</" ++ name ++ ">"
-
--}
