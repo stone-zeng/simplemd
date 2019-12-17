@@ -7,42 +7,54 @@ import Text.Regex
 import Text.Pretty.Simple (pPrint)
 
 main :: IO ()
-main = do
-  pPrint $ foldl parseMarkdown (Markdown []) [
-      "```c"
-    , "int main () {"
-    , "    return 0;"
-    , "}"
-    , "```"
-    ]
-  pPrint $ foldl parseMarkdown (Markdown []) [
-      "```python"
-    , "def f:"
-    , "\tpass"
-    , "```endpython"
-    , "```"
-    ]
-  pPrint $ foldl parseMarkdown (Markdown []) [
-      "```python"
-    , "def f:"
-    , "\tpass"
-    , "```"
-    , "something after"
-    ]
-  pPrint $ foldl parseMarkdown (Markdown []) [
-      "## Title"
-    , "# Title2"
-    , "```c"
-    , "- help"
-    , "1. First"
-    , "22. Twenty-two"
-    , "1.invalie ol"
-    , "-invalid ul"
-    , "> quote"
-    , ">> invalid quote"
-    , ">2invalid quote"
-    , "``invalid code"
-    ]
+main = let f = foldl parseMarkdown $ Markdown []
+  in pPrint $ map f [
+      [
+          "```c"
+        , "int main () {"
+        , "    return 0;"
+        , "}"
+        , "```"
+      ]
+    , [
+          "```python"
+        , "def f:"
+        , "\tpass"
+        , "```endpython"
+        , "```"
+      ]
+    , [
+          "```python"
+        , "def f:"
+        , "\tpass"
+        , "```"
+        , "something after"
+      ]
+    , [
+          "# Title"
+        , "```python"
+        , "# Comment"
+        , "def f:"
+        , "\tpass"
+        , "```"
+        , "something after"
+        , "## title2"
+      ]
+    , [
+          "## Title"
+        , "# Title2"
+        , "```c"
+        , "- help"
+        , "1. First"
+        , "22. Twenty-two"
+        , "1.invalie ol"
+        , "-invalid ul"
+        , "> quote"
+        , ">> invalid quote"
+        , ">2invalid quote"
+        , "``invalid code"
+      ]
+  ]
 
 --------------------------------------------------------------------------------
 
@@ -57,8 +69,8 @@ data ElemType = Plain
 type Url = String
 
 data InlineElem = InlineElem {
-    elemType    :: ElemType,
-    elemContent :: String
+    elemType    :: ElemType
+  , elemContent :: String
   } deriving (Show)
 
 data BlockElem = BlockPara    Para    BlockState -- ^ HTML <p>
@@ -75,14 +87,14 @@ newtype Para = Para [InlineElem] deriving (Show)
 
 -- HTML <h1>, <h2>, ... <h6>
 data Heading = Heading {
-        headingLevel   :: Int,
-        headingContent :: [InlineElem]
-    } deriving (Show)
+    headingLevel   :: Int
+  , headingContent :: [InlineElem]
+  } deriving (Show)
 
 -- HTML <pre>
 data Pre = Pre {
-    preLang    :: String,
-    preContent :: String
+    preLang    :: String
+  , preContent :: String
   } deriving (Show)
 
 -- HTML <ul>
@@ -90,8 +102,8 @@ newtype Ulist = Ulist [ListItem] deriving (Show)
 
 -- HTML <ol>
 data Olist = Olist {
-    olStart   :: Int,
-    olContent :: [ListItem]
+    olStart   :: Int
+  , olContent :: [ListItem]
   } deriving (Show)
 
 -- HTML <li>
@@ -120,20 +132,20 @@ quotePattern   = mkRegex "^> (.*)"              -- [<content>]
 parseHeading, parsePre, parseUlist, parseOlist, parseQuote :: [String] -> Markdown
 parseHeading result = Markdown [BlockHeading heading Closed]
   where heading = Heading {
-    headingLevel   = length $ head result,
-    headingContent = parseInline $ last result
+    headingLevel   = length $ head result
+  , headingContent = parseInline $ last result
   }
 parsePre result = Markdown [BlockPre pre Open]
   where pre = Pre {
-    preLang    = head result,
-    preContent = ""
+    preLang    = head result
+  , preContent = ""
   }
 parseUlist result = Markdown [BlockUlist ul Open]
   where ul = Ulist [ListInlineItem $ parseInline $ last result]
 parseOlist result = Markdown [BlockOlist ol Open]
   where ol = Olist {
-    olStart   = read $ head result,
-    olContent = [ListInlineItem $ parseInline $ last result]
+    olStart   = read $ head result
+  , olContent = [ListInlineItem $ parseInline $ last result]
   }
 parseQuote result = Markdown [BlockQuote quote Open]
   where quote = Quote [BlockPara (Para $ parseInline $ head result) Open]
@@ -166,10 +178,17 @@ parseMarkdown (Markdown mdElements) s =
         "```" -> Markdown $ init mdElements ++ [BlockPre pre Closed]
         _     -> Markdown $ init mdElements ++ [BlockPre newPre Open]
         where newPre = Pre {
-          preLang    = preLang pre,
-          preContent = preContent pre ++ "\n" ++ s
+          preLang    = preLang pre
+        , preContent = preContent pre ++ "\n" ++ s
         }
-    _ -> undefined
-  -- Markdown (mdElements ++ newMdElems)
-  -- where Markdown newMdElems =
-  -- parseMarkdown (Markdown []) s
+    BlockPara para Open ->
+      case s of
+        "" -> Markdown $ init mdElements ++ [BlockPara para Closed]
+        _  ->
+          Markdown $ mdElements ++ newMdElems
+            where Markdown newMdElems = parseMarkdown (Markdown []) s
+    _ ->
+      -- BlockPre _ Closed
+      -- BlockHeading _ Closed
+      Markdown $ mdElements ++ newMdElems
+        where Markdown newMdElems = parseMarkdown (Markdown []) s

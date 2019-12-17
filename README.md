@@ -7,7 +7,7 @@
   - [ ] Blockquotes
   - [ ] Ordered list
   - [ ] Unordered list
-  - [ ] Code blocks
+  - [x] Code blocks
   - [ ] Horizontal rules
 - Inline elements
   - [ ] Links
