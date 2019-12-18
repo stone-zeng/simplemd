@@ -43,17 +43,31 @@ main = let f = foldl parseMarkdown $ Markdown []
     --   ]
     -- , ["Word1", "Word2", "Word3"]
     -- , ["text", "text", "- list1", "- list2", "  - indent", "- item next", "text3"]
-    , [
-        "Text"
-      , "- ul1"
-      , "- ul2"
-      , "- ul3"
-      , "1. ol1"
-      , "2. ol2"
-      , "1. ol3"
-      , "- ul another"
-      , "3. ol another"
-      ]
+    -- , [
+    --     "Text"
+    --   , "- ul1"
+    --   , "- ul2"
+    --   , "- ul3"
+    --   , "1. ol1"
+    --   , "2. ol2"
+    --   , "1. ol3"
+    --   , "- ul another"
+    --   , "3. ol another"
+    --   ]
+    , ["> quote"]
+    , [">q"]
+    , [">> dq"]
+    , [">>dq"]
+    , [">"]
+    , [">>>"]
+    -- , [
+    --     "> Quote"
+    --   , "> Quote cont."
+    --   , "> - List in quote 1"
+    --   , "> - List in quote 2"
+    --   , "1. List"
+    --   , "1. List2"
+    --   ]
     -- , [
     --       "## Title"
     --     , "# Title2"
@@ -72,7 +86,7 @@ main = let f = foldl parseMarkdown $ Markdown []
 
 --------------------------------------------------------------------------------
 
-
+-- TODO: support nested elements
 data ElemType = Plain
               | Code      -- ^ HTML <code>
               | Emph      -- ^ HTML <em>
@@ -87,60 +101,24 @@ data InlineElem = InlineElem {
   , elemContent :: String
   } deriving (Show)
 
-data BlockElem = BlockPara    Para    BlockState -- ^ HTML <p>
-               | BlockHeading Heading BlockState -- ^ HTML <h1>, <h2>, ... <h6>
-               | BlockPre     Pre     BlockState -- ^ HTML <pre>
-               | BlockUlist   Ulist   BlockState -- ^ HTML <ul>
-               | BlockOlist   Olist   BlockState -- ^ HTML <ol>
-               | BlockQuote   Quote   BlockState -- ^ HTML <blockquote>
-  deriving (Show)
 data BlockState = Open | Closed deriving (Show)
 
--- HTML <p>
-newtype Para = Para [InlineElem] deriving (Show)
-
--- HTML <h1>, <h2>, ... <h6>
-data Heading = Heading {
-    headingLevel   :: Int
-  , headingContent :: [InlineElem]
-  } deriving (Show)
-
--- HTML <pre>
-data Pre = Pre {
-    preLang    :: String
-  , preContent :: String
-  } deriving (Show)
-
-class HtmlList a where
-  addItem :: a -> ListItem -> a
+data BlockElem = Para     BlockState          [InlineElem]   -- ^ HTML <p>
+               | Heading  BlockState  Int     [InlineElem]   -- ^ HTML <h1>, <h2>, ... <h6>
+               | Pre      BlockState  String  String         -- ^ HTML <pre>
+               | Ulist    BlockState          [ListItem]     -- ^ HTML <ul>
+               | Olist    BlockState  Int     [ListItem]     -- ^ HTML <ol>
+               | Quote    BlockState          [BlockElem]    -- ^ HTML <blockquote>
+  deriving (Show)
 
 -- HTML <li>
 data ListItem = ListInlineItem [InlineElem]
               | ListBlockItem  [ListBlockElem]
   deriving (Show)
-data ListBlockElem = ListBlockPara  Para
-                   | ListBlockUlist Ulist
-                   | ListBlockOlist Olist
+data ListBlockElem = ListBlockPara  [InlineElem]
+                   | ListBlockUlist [ListItem]
+                   | ListBlockOlist [ListItem]
   deriving (Show)
-
--- HTML <ul>
-newtype Ulist = Ulist [ListItem] deriving (Show)
-instance HtmlList Ulist where
-  addItem (Ulist ulist) x = Ulist $ ulist ++ [x]
-
--- HTML <ol>
-data Olist = Olist {
-    olStart   :: Int
-  , olContent :: [ListItem]
-  } deriving (Show)
-instance HtmlList Olist where
-  addItem olist x = Olist {
-    olStart   = olStart olist
-  , olContent = olContent olist ++ [x]
-  }
-
--- HTML <blockquote>
-newtype Quote = Quote [BlockElem] deriving (Show)
 
 newtype Markdown = Markdown [BlockElem] deriving (Show)
 
@@ -150,6 +128,12 @@ Markdown list1 <+> Markdown list2 = Markdown (list1 ++ list2)
 (<:>) :: [BlockElem] -> Markdown -> Markdown
 list1 <:> Markdown list2 = Markdown (list1 ++ list2)
 
+(<++>) :: [BlockElem] -> [BlockElem] -> Markdown
+list1 <++> list2 = Markdown (list1 ++ list2)
+
+mdAppend :: [BlockElem] -> BlockElem -> Markdown
+mdAppend list e = Markdown (list ++ [e])
+
 --------------------------------------------------------------------------------
 
 headingPattern, prePattern, ulistPattern, olistPattern, quotePattern :: Regex
@@ -157,99 +141,92 @@ headingPattern = mkRegex "^(#{1,6}) (.*)"       -- [<#>, <content>]
 prePattern     = mkRegex "^```(.*)"             -- [<pre lang>]
 ulistPattern   = mkRegex "^\\- (.*)"            -- [<content>]
 olistPattern   = mkRegex "^([0-9]+)\\. (.*)"    -- [<number>, <content>]
-quotePattern   = mkRegex "^> (.*)"              -- [<content>]
+quotePattern   = mkRegex "^> *(.*)"             -- [<content>]
 
-parseHeading, parsePre, parseUlist, parseOlist, parseQuote :: [String] -> Markdown
-parseHeading result = Markdown [BlockHeading heading Closed]
-  where heading = Heading {
-    headingLevel   = length $ head result
-  , headingContent = parseInline $ last result
-  }
-parsePre result = Markdown [BlockPre pre Open]
-  where pre = Pre {
-    preLang    = head result
-  , preContent = ""
-  }
-parseUlist result = Markdown [BlockUlist ul Open]
-  where ul = Ulist [ListInlineItem $ parseInline $ last result]
-parseOlist result = Markdown [BlockOlist ol Open]
-  where ol = Olist {
-    olStart   = read $ head result
-  , olContent = [ListInlineItem $ parseInline $ last result]
-  }
-parseQuote result = Markdown [BlockQuote quote Open]
-  where quote = Quote [BlockPara (Para $ parseInline $ head result) Open]
+parseHeading, parsePre, parseUlist, parseOlist, parseQuote :: [String] -> BlockElem
+parseHeading result   = Heading Closed headingLevel headingText
+  where headingLevel  = length $ head result
+        headingText   = parseInline $ last result
+parsePre result       = Pre Open preLang preText
+  where preLang       = head result
+        preText       = ""
+parseUlist result     = Ulist Open listItems
+  where listItems     = [ListInlineItem $ parseInline $ last result]
+parseOlist result     = Olist Open olStart listItems
+  where olStart       = read $ head result
+        listItems     = [ListInlineItem $ parseInline $ last result]
+parseQuote result     = Quote Open quote
+  where quote         = [Para Open (parseInline $ head result)]
 
 parseInline :: String -> [InlineElem]
 parseInline s = [InlineElem {elemType = Plain, elemContent = s}]
 
 parseMarkdown :: Markdown -> String -> Markdown
-parseMarkdown (Markdown []) s =
-  case matchRegex headingPattern s of
-    Just result -> parseHeading result
-    Nothing ->
-      case matchRegex prePattern s of
-        Just result -> parsePre result
-        Nothing ->
-          case matchRegex ulistPattern s of
-            Just result -> parseUlist result
-            Nothing ->
-              case matchRegex olistPattern s of
-                Just result -> parseOlist result
-                Nothing ->
-                  case matchRegex quotePattern s of
-                    Just result -> parseQuote result
-                    Nothing -> Markdown [BlockPara (Para $ parseInline s) Open]
+parseMarkdown (Markdown []) s = Markdown [
+    case matchRegex headingPattern s of
+      Just result -> parseHeading result
+      Nothing ->
+        case matchRegex prePattern s of
+          Just result -> parsePre result
+          Nothing ->
+            case matchRegex ulistPattern s of
+              Just result -> parseUlist result
+              Nothing ->
+                case matchRegex olistPattern s of
+                  Just result -> parseOlist result
+                  Nothing ->
+                    case matchRegex quotePattern s of
+                      Just result -> parseQuote result
+                      Nothing -> Para Open (parseInline s)
+  ]
 
 parseMarkdown (Markdown mdElements) s =
   case last mdElements of
-    BlockPre pre Open ->
+    Pre Open preLang preText ->
       case s of
-        "```" -> Markdown $ init mdElements ++ [BlockPre pre Closed]
-        _     -> Markdown $ init mdElements ++ [BlockPre newPre Open]
-          where newPre = Pre {
-            preLang    = preLang pre
-          , preContent = preContent pre ++ "\n" ++ s
-          }
-    BlockPara para Open ->
+        "```" -> init mdElements `mdAppend` Pre Closed preLang preText
+        _     -> init mdElements `mdAppend` Pre Open preLang (preText ++ "\n" ++ s)
+    Para Open para ->
       case s of
-        "" -> Markdown $ init mdElements ++ [BlockPara para Closed]
+        "" -> init mdElements `mdAppend` Para Closed para
         _  ->
           case matchRegex headingPattern s of
-            Just result -> mdElements <:> parseHeading result
+            Just result -> mdElements `mdAppend` parseHeading result
             Nothing ->
               case matchRegex prePattern s of
-                Just result -> mdElements <:> parsePre result
+                Just result -> mdElements `mdAppend` parsePre result
                 Nothing ->
                   case matchRegex ulistPattern s of
-                    Just result -> mdElements <:> parseUlist result
+                    Just result -> mdElements `mdAppend` parseUlist result
                     Nothing ->
                       case matchRegex olistPattern s of
-                        Just result -> mdElements <:> parseOlist result
+                        Just result -> mdElements `mdAppend` parseOlist result
                         Nothing ->
                           case matchRegex quotePattern s of
-                            Just result -> parseQuote result
+                            Just result -> Markdown [parseQuote result]
                             Nothing ->
-                              Markdown $ init mdElements ++
-                                [BlockPara (Para $ items ++ parseInline s) Open]
-                              where Para items = para
-    BlockUlist ulist Open ->
+                              init mdElements `mdAppend` Para Open (para ++ parseInline s)
+    Ulist Open listItems ->
       case s of
-        "" -> Markdown $ init mdElements ++ [BlockUlist ulist Closed]
+        "" -> init mdElements `mdAppend` Ulist Closed listItems
         _  ->
           -- TODO: indent
           case matchRegex ulistPattern s of
-            Just result -> init mdElements <:> Markdown [BlockUlist ul Open]
-              where ul = ulist `addItem` (ListInlineItem $ parseInline $ last result)
+            Just result -> init mdElements `mdAppend` Ulist Open (listItems ++ [newListItem])
+              where newListItem = ListInlineItem (parseInline $ last result)
             Nothing -> mdElements <:> parseMarkdown (Markdown []) s
-    BlockOlist olist Open ->
+    Olist Open olStart listItems ->
       case s of
-        "" -> Markdown $ init mdElements ++ [BlockOlist olist Closed]
+        "" -> Markdown $ init mdElements ++ [Olist Closed olStart listItems]
         _  ->
           -- TODO: indent
           case matchRegex olistPattern s of
-            Just result -> init mdElements <:> Markdown [BlockOlist ol Open]
-              where ol = olist `addItem` (ListInlineItem $ parseInline $ last result)
+            Just result -> init mdElements `mdAppend` Olist Open olStart (listItems ++ [newListItem])
+              where newListItem = ListInlineItem (parseInline $ last result)
             Nothing -> mdElements <:> parseMarkdown (Markdown []) s
+    -- BlockQuote quote Open ->
+    --   case s of
+    --     "" -> Markdown $ init mdElements ++ [BlockQuote quote Closed]
+    --     _ -> undefined
     _ ->
       mdElements <:> parseMarkdown (Markdown []) s
