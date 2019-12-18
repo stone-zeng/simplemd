@@ -122,14 +122,14 @@ data ListBlockElem = ListBlockPara  [InlineElem]
 
 newtype Markdown = Markdown [BlockElem] deriving (Show)
 
-(<+>) :: Markdown -> Markdown -> Markdown
-Markdown list1 <+> Markdown list2 = Markdown (list1 ++ list2)
+-- (<+>) :: Markdown -> Markdown -> Markdown
+-- Markdown list1 <+> Markdown list2 = Markdown (list1 ++ list2)
 
 (<:>) :: [BlockElem] -> Markdown -> Markdown
 list1 <:> Markdown list2 = Markdown (list1 ++ list2)
 
-(<++>) :: [BlockElem] -> [BlockElem] -> Markdown
-list1 <++> list2 = Markdown (list1 ++ list2)
+-- (<++>) :: [BlockElem] -> [BlockElem] -> Markdown
+-- list1 <++> list2 = Markdown (list1 ++ list2)
 
 mdAppend :: [BlockElem] -> BlockElem -> Markdown
 mdAppend list e = Markdown (list ++ [e])
@@ -161,31 +161,43 @@ parseQuote result     = Quote Open quote
 parseInline :: String -> [InlineElem]
 parseInline s = [InlineElem {elemType = Plain, elemContent = s}]
 
+type MarkdownWrapper = Either Markdown String
+
+_generateParser :: Regex -> ([String] -> BlockElem) -> (String -> MarkdownWrapper)
+_generateParser pattern parser = \s -> case matchRegex pattern s of
+  Just x  -> Left $ Markdown [parser x]
+  Nothing -> Right s
+
+parseHeading2, parsePre2, parseUlist2, parseOlist2, parseQuote2 :: String -> MarkdownWrapper
+parseHeading2 = _generateParser headingPattern parseHeading
+parsePre2     = _generateParser prePattern     parsePre
+parseUlist2   = _generateParser ulistPattern   parseUlist
+parseOlist2   = _generateParser olistPattern   parseOlist
+parseQuote2   = _generateParser quotePattern   parseQuote
+
+parsePara2 :: String -> MarkdownWrapper
+parsePara2 s = Left $ Markdown [Para Open (parseInline s)]
+
+-- (<==) :: (String -> MarkdownWrapper) -> MarkdownWrapper -> MarkdownWrapper
+-- (<==) = undefined
+-- infixr 5 <==
+
 parseMarkdown :: Markdown -> String -> Markdown
-parseMarkdown (Markdown []) s = Markdown [
-    case matchRegex headingPattern s of
-      Just result -> parseHeading result
-      Nothing ->
-        case matchRegex prePattern s of
-          Just result -> parsePre result
-          Nothing ->
-            case matchRegex ulistPattern s of
-              Just result -> parseUlist result
-              Nothing ->
-                case matchRegex olistPattern s of
-                  Just result -> parseOlist result
-                  Nothing ->
-                    case matchRegex quotePattern s of
-                      Just result -> parseQuote result
-                      Nothing -> Para Open (parseInline s)
-  ]
+
+parseMarkdown (Markdown []) s = result
+  where Left result = parseHeading2 s
+                  >>= parsePre2
+                  >>= parseUlist2
+                  >>= parseOlist2
+                  >>= parseQuote2
+                  >>= parsePara2
 
 parseMarkdown (Markdown mdElements) s =
   case last mdElements of
     Pre Open preLang preText ->
       case s of
-        "```" -> init mdElements `mdAppend` Pre Closed preLang preText
-        _     -> init mdElements `mdAppend` Pre Open preLang (preText ++ "\n" ++ s)
+        "```" -> Markdown $ init mdElements ++ [Pre Closed preLang preText]
+        _     -> Markdown $ init mdElements ++ [Pre Open preLang (preText ++ "\n" ++ s)]
     Para Open para ->
       case s of
         "" -> init mdElements `mdAppend` Para Closed para
