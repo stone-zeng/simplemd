@@ -1,43 +1,62 @@
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
 import Control.Monad
--- import Data.List
--- import qualified Data.Text as Text
 import Text.Regex
-
-import qualified Graphics.UI.Threepenny         as UI
-import           Graphics.UI.Threepenny.Core
+import Graphics.UI.Threepenny.Core
+import qualified Graphics.UI.Threepenny as UI
 
 import Parse
 
 main :: IO ()
-main = startGUI defaultConfig setup
+main = startGUI defaultConfig
+  { jsCustomHTML = Just "index.html"
+  , jsStatic     = Just "static"
+  } setup
 
 setup :: Window -> UI ()
 setup rootWindow = void $ do
-  return rootWindow # set title "SVG"
+  return rootWindow # set title "SimpleMD"
 
-  heading <- UI.h1 # set text "SVG Two Ways"
+  heading <- UI.h1
+    # set text "Welcome to SimpleMD!"
 
-  textarea <- (UI.div # set contenteditable "true") #+ [
-      UI.div # set text "# Heading 1"
-    , UI.div # set text "## Heading 2"
-    ]
-  result <- UI.div # set text ""
+  description <- UI.h2
+    # set text "Project homepage: "
+    #+
+      [UI.a # set text "https://github.com/stone-zeng/simplemd"
+            # set href "https://github.com/stone-zeng/simplemd"]
 
-  getBody rootWindow #+ [
-      element heading
-    , element textarea
-    , element result
-    ]
+  mdInput <- UI.div
+    # set contenteditable "true"
+    # set cssClass "md-input"
+    #+
+      [ UI.div # set text "# Heading 1"
+      , UI.div # set text "## Heading 2"
+      ]
 
-  on UI.valueChange textarea $ \_ -> do
-    markdownText <- get myText textarea
+  mdOutput <- UI.div
+    # set text ""
+    # set cssClass "md-output"
+
+  wrapper <- UI.div
+    # set cssClass "wrapper"
+    #+ map element [mdInput, mdOutput]
+
+  getBody rootWindow
+    #+ map element [heading, description, wrapper]
+
+  on UI.valueChange mdInput $ \_ -> do
+    markdownText <- get myText mdInput
     -- element textarea # set html (highlight markdownText)
-    element result   # set text (show $ parse $ splitLine markdownText)
+    element mdOutput   # set text (show $ parse $ splitLine markdownText)
 
-contenteditable :: WriteAttr Element String
-contenteditable = mkWriteAttr (set' (attr "contenteditable"))
+generateAttr :: String -> WriteAttr Element String
+generateAttr = mkWriteAttr . set' . attr
+
+contenteditable, href, cssClass :: WriteAttr Element String
+contenteditable = generateAttr "contenteditable"
+href            = generateAttr "href"
+cssClass        = generateAttr "class"
 
 myText :: Attr Element String
 myText = mkReadWriteAttr _get _set

@@ -1,0 +1,32 @@
+body {
+    font: 400 16px/1.6 'Avenir Next', 'Source Han Sans SC', sans-serif;
+    font-feature-settings: 'kern';
+    font-kerning: normal;
+}
+
+h1, h2 {
+    padding-left: 40px;
+}
+
+h2 {
+    font-size: large;
+    font-weight: 400;
+}
+
+.wrapper {
+    margin: 0 40px;
+    display: flex;
+    border: 1px solid #e8e8e8;
+}
+
+.md-input {
+    flex: 50%;
+    border-right: 1px solid #e8e8e8;
+    padding: 5px;
+    font-family: 'Source Code Pro', Consolas monospace;
+}
+
+.md-output {
+    flex: 50%;
+    padding: 5px;
+}
