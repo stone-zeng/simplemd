@@ -3,7 +3,10 @@
 simplemd
 simplemd.hi
 simplemd.o
+dist/
 dist-newstyle/
+temp/
 
 cabal.project.local
 cabal.project.local~
+.ghc*
