@@ -1,93 +1,95 @@
-module Parse
-  (
-    Markdown
+module Parse (
+    InlineElem    (..)
+  , BlockElem     (..)
+  , ListItem      (..)
+  , ListBlockElem (..)
+  , Markdown      (..)
   , parse
-  )
-  where
+  ) where
 
 import Text.Regex
-import Text.Pretty.Simple (pPrint)
+-- import Text.Pretty.Simple (pPrint)
 
 parse :: [String] -> Markdown
 parse = foldl parseMarkdown $ Markdown []
 
-main :: IO ()
-main = let f = foldl parseMarkdown $ Markdown []
-  in pPrint $ map f [
-      [
-          "```c"
-        , "int main () {"
-        , "    return 0;"
-        , "}"
-        , "```"
-      ]
-    -- , [
-    --       "```python"
-    --     , "def f:"
-    --     , "\tpass"
-    --     , "```endpython"
-    --     , "```"
-    --   ]
-    -- , [
-    --       "```python"
-    --     , "def f:"
-    --     , "\tpass"
-    --     , "```"
-    --     , "something after"
-    --     , "more thing after"
-    --   ]
-    -- , [
-    --       "# Title"
-    --     , "```python"
-    --     , "# Comment"
-    --     , "def f:"
-    --     , "\tpass"
-    --     , "```"
-    --     , "something after"
-    --     , "## title2"
-    --   ]
-    -- , ["Word1", "Word2", "Word3"]
-    -- , ["text", "text", "- list1", "- list2", "  - indent", "- item next", "text3"]
-    -- , [
-    --     "Text"
-    --   , "- ul1"
-    --   , "- ul2"
-    --   , "- ul3"
-    --   , "1. ol1"
-    --   , "2. ol2"
-    --   , "1. ol3"
-    --   , "- ul another"
-    --   , "3. ol another"
-    --   ]
-    , ["> quote"]
-    , [">q"]
-    , [">> dq"]
-    , [">>dq"]
-    , [">"]
-    , [">>>"]
-    , [
-        "> Quote"
-      , "> Quote cont."
-      , "> - List in quote 1"
-      , "> - List in quote 2"
-      , "1. List"
-      , "1. List2"
-      ]
-    -- , [
-    --       "## Title"
-    --     , "# Title2"
-    --     , "```c"
-    --     , "- help"
-    --     , "1. First"
-    --     , "22. Twenty-two"
-    --     , "1.invalie ol"
-    --     , "-invalid ul"
-    --     , "> quote"
-    --     , ">> invalid quote"
-    --     , ">2invalid quote"
-    --     , "``invalid code"
-    --   ]
-  ]
+-- main :: IO ()
+-- main = let f = foldl parseMarkdown $ Markdown []
+--   in pPrint $ map f [
+--       [
+--           "```c"
+--         , "int main () {"
+--         , "    return 0;"
+--         , "}"
+--         , "```"
+--       ]
+--     -- , [
+--     --       "```python"
+--     --     , "def f:"
+--     --     , "\tpass"
+--     --     , "```endpython"
+--     --     , "```"
+--     --   ]
+--     -- , [
+--     --       "```python"
+--     --     , "def f:"
+--     --     , "\tpass"
+--     --     , "```"
+--     --     , "something after"
+--     --     , "more thing after"
+--     --   ]
+--     -- , [
+--     --       "# Title"
+--     --     , "```python"
+--     --     , "# Comment"
+--     --     , "def f:"
+--     --     , "\tpass"
+--     --     , "```"
+--     --     , "something after"
+--     --     , "## title2"
+--     --   ]
+--     -- , ["Word1", "Word2", "Word3"]
+--     -- , ["text", "text", "- list1", "- list2", "  - indent", "- item next", "text3"]
+--     -- , [
+--     --     "Text"
+--     --   , "- ul1"
+--     --   , "- ul2"
+--     --   , "- ul3"
+--     --   , "1. ol1"
+--     --   , "2. ol2"
+--     --   , "1. ol3"
+--     --   , "- ul another"
+--     --   , "3. ol another"
+--     --   ]
+--     , ["> quote"]
+--     , [">q"]
+--     , [">> dq"]
+--     , [">>dq"]
+--     , [">"]
+--     , [">>>"]
+--     , [
+--         "> Quote"
+--       , "> Quote cont."
+--       , "> - List in quote 1"
+--       , "> - List in quote 2"
+--       , "1. List"
+--       , "1. List2"
+--       ]
+--     -- , [
+--     --       "## Title"
+--     --     , "# Title2"
+--     --     , "```c"
+--     --     , "- help"
+--     --     , "1. First"
+--     --     , "22. Twenty-two"
+--     --     , "1.invalie ol"
+--     --     , "-invalid ul"
+--     --     , "> quote"
+--     --     , ">> invalid quote"
+--     --     , ">2invalid quote"
+--     --     , "``invalid code"
+--     --   ]
+--   ]
 
 --------------------------------------------------------------------------------
 
@@ -127,8 +129,8 @@ data ListBlockElem = ListBlockPara  [InlineElem]
 
 newtype Markdown = Markdown [BlockElem] deriving (Show)
 
-(<+>) :: Markdown -> Markdown -> Markdown
-Markdown list1 <+> Markdown list2 = Markdown (list1 ++ list2)
+-- (<+>) :: Markdown -> Markdown -> Markdown
+-- Markdown list1 <+> Markdown list2 = Markdown (list1 ++ list2)
 
 (<:>) :: [BlockElem] -> Markdown -> Markdown
 list1 <:> Markdown list2 = Markdown (list1 ++ list2)
