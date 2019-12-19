@@ -3,3 +3,7 @@
 simplemd
 simplemd.hi
 simplemd.o
+dist-newstyle/
+
+cabal.project.local
+cabal.project.local~
