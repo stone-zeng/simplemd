@@ -7,7 +7,8 @@ module Parse (
   , parse
   ) where
 
-import Text.Regex
+-- import "regex-compat-tdfa" Text.Regex
+import qualified Text.Regex as Regex
 -- import Text.Pretty.Simple (pPrint)
 
 parse :: [String] -> Markdown
@@ -143,12 +144,12 @@ mdAppend list e = Markdown (list ++ [e])
 
 --------------------------------------------------------------------------------
 
-headingPattern, prePattern, ulistPattern, olistPattern, quotePattern :: Regex
-headingPattern = mkRegex "^(#{1,6}) (.*)"       -- [<#>, <content>]
-prePattern     = mkRegex "^```(.*)"             -- [<pre lang>]
-ulistPattern   = mkRegex "^\\- (.*)"            -- [<content>]
-olistPattern   = mkRegex "^([0-9]+)\\. (.*)"    -- [<number>, <content>]
-quotePattern   = mkRegex "^> *(.*)"             -- [<content>]
+headingPattern, prePattern, ulistPattern, olistPattern, quotePattern :: Regex.Regex
+headingPattern = Regex.mkRegex "^(#{1,6}) (.*)"       -- [<#>, <content>]
+prePattern     = Regex.mkRegex "^```(.*)"             -- [<pre lang>]
+ulistPattern   = Regex.mkRegex "^\\- (.*)"            -- [<content>]
+olistPattern   = Regex.mkRegex "^([0-9]+)\\. (.*)"    -- [<number>, <content>]
+quotePattern   = Regex.mkRegex "^> *(.*)"             -- [<content>]
 
 parseHeading, parsePre, parseUlist, parseOlist, parseQuote :: [String] -> BlockElem
 parseHeading result   = Heading Closed headingLevel headingText
@@ -170,8 +171,8 @@ parseInline s = [InlineElem {elemType = Plain, elemContent = s}]
 
 type MarkdownWrapper = Either Markdown String
 
-generateParser :: Regex -> ([String] -> BlockElem) -> (String -> MarkdownWrapper)
-generateParser pattern parser = \s -> case matchRegex pattern s of
+generateParser :: Regex.Regex -> ([String] -> BlockElem) -> (String -> MarkdownWrapper)
+generateParser pattern parser = \s -> case Regex.matchRegex pattern s of
   Just x  -> Left $ Markdown [parser x]
   Nothing -> Right s
 
@@ -236,7 +237,7 @@ parseMarkdown (Markdown mdElements) s =
         "" -> init mdElements `mdAppend` Ulist Closed listItems
         _  ->
           -- TODO: indent
-          case matchRegex ulistPattern s of
+          case Regex.matchRegex ulistPattern s of
             Just result -> init mdElements `mdAppend` Ulist Open (listItems ++ [newListItem])
               where newListItem = ListInlineItem (parseInline $ last result)
             Nothing -> mdElements <:> parseMarkdown (Markdown []) s
@@ -245,7 +246,7 @@ parseMarkdown (Markdown mdElements) s =
         "" -> Markdown $ init mdElements ++ [Olist Closed olStart listItems]
         _  ->
           -- TODO: indent
-          case matchRegex olistPattern s of
+          case Regex.matchRegex olistPattern s of
             Just result -> init mdElements `mdAppend` Olist Open olStart (listItems ++ [newListItem])
               where newListItem = ListInlineItem (parseInline $ last result)
             Nothing -> mdElements <:> parseMarkdown (Markdown []) s

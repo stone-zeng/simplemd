@@ -1,67 +1,58 @@
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
-module Gui (
-    gui
-  ) where
+module Gui (gui) where
 
 import Control.Monad
-import Graphics.UI.Threepenny.Core
+import Graphics.UI.Threepenny ((#), (#+))
 import qualified Graphics.UI.Threepenny as UI
 
 import Html
 
-gui :: Window -> UI ()
+gui :: UI.Window -> UI.UI ()
 gui rootWindow = void $ do
-  return rootWindow # set title "SimpleMD"
+  return rootWindow # UI.set UI.title "SimpleMD"
 
   heading <- UI.h1
-    # set text "Welcome to SimpleMD!"
+    # UI.set UI.text "Welcome to SimpleMD!"
 
   description <- UI.h2
-    # set text "Project homepage: "
+    # UI.set UI.text "Project homepage: "
     #+
-      [UI.a # set text "https://github.com/stone-zeng/simplemd"
-            # set href "https://github.com/stone-zeng/simplemd"]
+      [UI.a # UI.set UI.text "https://github.com/stone-zeng/simplemd"
+            # UI.set UI.href "https://github.com/stone-zeng/simplemd"]
 
   mdInput <- UI.div
-    # set contenteditable "true"
-    # set htmlClass "md-input"
+    # UI.set contenteditable "true"
+    # UI.set UI.class_ "md-input"
     #+
-      [ UI.div # set text "# Heading 1"
-      , UI.div # set text "## Heading 2"
+      [ UI.div # UI.set UI.text "# Heading 1"
+      , UI.div # UI.set UI.text "## Heading 2"
       ]
 
   mdOutput <- UI.div
-    # set text ""
-    # set htmlClass "md-output"
+    # UI.set UI.text ""
+    # UI.set UI.class_ "md-output"
 
   wrapper <- UI.div
-    # set htmlClass "wrapper"
-    #+ map element [mdInput, mdOutput]
+    # UI.set UI.class_ "wrapper"
+    #+ map UI.element [mdInput, mdOutput]
 
-  getBody rootWindow
-    #+ map element [heading, description, wrapper]
+  UI.getBody rootWindow
+    #+ map UI.element [heading, description, wrapper]
 
-  on UI.valueChange mdInput $ \_ -> do
-    -- _ <- callFunction jsPrint
-    markdownText <- get htmlText mdInput
-    element mdOutput
-      # set html (markdownToHtml markdownText)
+  UI.on UI.valueChange mdInput $ \_ -> do
+    markdownText <- UI.get htmlText mdInput
+    UI.element mdOutput
+      # UI.set UI.html (markdownToHtml markdownText)
 
-updateDom :: String -> JSFunction String
-updateDom = ffi "document.querySelector('.md-output').innerHTML=%1"
+generateAttr :: String -> UI.WriteAttr UI.Element String
+generateAttr = UI.mkWriteAttr . UI.set' . UI.attr
 
-generateAttr :: String -> WriteAttr Element String
-generateAttr = mkWriteAttr . set' . attr
-
-contenteditable, href, htmlClass :: WriteAttr Element String
+contenteditable :: UI.WriteAttr UI.Element String
 contenteditable = generateAttr "contenteditable"
-href            = generateAttr "href"
-htmlClass       = generateAttr "class"
 
-
-htmlText :: Attr Element String
-htmlText = mkReadWriteAttr get_ set_
+htmlText :: UI.Attr UI.Element String
+htmlText = UI.mkReadWriteAttr get set
   where
-    get_   el = callFunction $ ffi "$(%1).html()" el
-    set_ v el = runFunction  $ ffi "$(%1).html(%2)" el v
+    get   el = UI.callFunction $ UI.ffi "$(%1).html()" el
+    set v el = UI.runFunction  $ UI.ffi "$(%1).html(%2)" el v

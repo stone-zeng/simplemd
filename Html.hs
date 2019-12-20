@@ -1,16 +1,13 @@
-module Html (
-    splitLine
-  , markdownToHtml
-  ) where
+module Html (splitLine, markdownToHtml) where
 
-import Text.Regex
+import qualified Text.Regex as Regex
 
 import Parse
 
 splitLine :: String -> [String]
-splitLine s = removeEmptyLine $ map replaceBr $ splitRegex pattern s
+splitLine s = removeEmptyLine $ map replaceBr $ Regex.splitRegex pattern s
   where
-    pattern = mkRegex "</div><div>|<div>|</div>"
+    pattern = Regex.mkRegex "</div><div>|<div>|</div>"
 
     replaceBr "<br>" = ""
     replaceBr x = x
