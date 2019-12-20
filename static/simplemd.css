@@ -1,32 +1,103 @@
 body {
-    font: 400 16px/1.6 'Avenir Next', 'Source Han Sans SC', sans-serif;
-    font-feature-settings: 'kern';
-    font-kerning: normal;
+  font: 400 16px/1.6 'Avenir Next', 'Source Han Sans SC', sans-serif;
+  font-feature-settings: 'kern';
+  font-kerning: normal;
 }
 
 h1, h2 {
-    padding-left: 40px;
+  padding-left: 40px;
 }
 
 h2 {
-    font-size: large;
-    font-weight: 400;
+  font-size: large;
+  font-weight: 400;
+}
+
+.header-wrapper, .wrapper {
+  margin: 0 40px;
+  display: flex;
+}
+
+.header-wrapper h3 {
+  font-size: small;
+  font-weight: 400;
+  letter-spacing: 1px;
+  color: #9E9E9E;
+}
+
+.header-input {
+  flex: 50%;
+  padding: 20px 5px;
+  margin: 0;
+}
+
+.header-output {
+  flex: 50%;
+  padding: 20px 20px;
+  margin: 0;
+}
+
+.icon {
+  margin-left: 1em;
+  position: relative;
+  top: 3px;
 }
 
 .wrapper {
-    margin: 0 40px;
-    display: flex;
-    border: 1px solid #e8e8e8;
+  border: 1px solid #E8E8E8;
 }
 
 .md-input {
-    flex: 50%;
-    border-right: 1px solid #e8e8e8;
-    padding: 5px;
-    font-family: 'Source Code Pro', Consolas monospace;
+  font-family: 'Source Code Pro', Consolas monospace;
+  flex: 50%;
+  border-right: 1px solid #E8E8E8;
+  padding: 5px 5px;
 }
 
 .md-output {
-    flex: 50%;
-    padding: 5px;
+  flex: 50%;
+  padding: 5px 20px;
+}
+
+.md-output h1,
+.md-output h2,
+.md-output h3,
+.md-output h4,
+.md-output h5,
+.md-output h6 {
+  padding-left: 0;
+  font-weight: 600;
+}
+
+.md-output h1 {
+  font-size: 36px;
+}
+
+.md-output h2 {
+  font-size: 32px;
+}
+
+.md-output h3 {
+  font-size: 28px;
+}
+
+.md-output h4 {
+  font-size: 24px;
+}
+
+.md-output h5 {
+  font-size: 20px;
+}
+
+.md-output h6 {
+  font-size: 16px;
+}
+
+.md-output ol,
+.md-output ul {
+  padding-left: 1em;
+}
+
+.md-output code {
+  font-family: 'Source Code Pro', Consolas monospace;
 }

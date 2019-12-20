@@ -50,7 +50,7 @@ blockToHtml :: BlockElem -> HTML
 blockToHtml (Para    _       content) = addTag "p" $ inlineListToHtml content
 blockToHtml (Heading _ level content) = addTag tag $ inlineListToHtml content
   where tag = "h" ++ show level
-blockToHtml (Pre     _ lang  content) = addTag' "pre" attr content
+blockToHtml (Pre     _ lang  content) = addTag "pre" $ addTag' "code" attr content
   where attr = "class='lang-" ++ lang ++ "'"
 blockToHtml (Ulist   _       content) = addTag "ul" (concat $ map listItemToHtml content)
 blockToHtml (Olist   _ start content) = addTag' "ol" attr (concat $ map listItemToHtml content)
