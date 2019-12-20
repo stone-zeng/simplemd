@@ -49,6 +49,7 @@ h2 {
 
 .md-input {
   font-family: 'Source Code Pro', Consolas monospace;
+  white-space: pre-wrap;
   flex: 50%;
   border-right: 1px solid #E8E8E8;
   padding: 5px 5px;

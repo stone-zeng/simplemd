@@ -10,8 +10,8 @@ import Html
 import Svg
 
 gui :: UI.Window -> UI.UI ()
-gui rootWindow = void $ do
-  return rootWindow # UI.set UI.title "SimpleMD"
+gui window = void $ do
+  return window # UI.set UI.title "SimpleMD"
 
   title <- UI.h1
     # UI.set UI.text "Welcome to SimpleMD!"
@@ -43,7 +43,7 @@ gui rootWindow = void $ do
     #. "wrapper"
     #+ map UI.element [mdInput, mdOutput]
 
-  UI.getBody rootWindow
+  UI.getBody window
     #+ map UI.element [title, description, header, wrapper]
 
   UI.on UI.valueChange mdInput $ \_ -> do
@@ -68,9 +68,9 @@ initMdInput =
   , UI.div #+ [UI.br]
   , UI.div # UI.set UI.text "## Heading 2"
   , UI.div #+ [UI.br]
-  , UI.div # UI.set UI.text "```c"
-  , UI.div # UI.set UI.text "int main() {"
-  , UI.div # UI.set UI.text "  return 0;"
-  , UI.div # UI.set UI.text "}"
+  , UI.div # UI.set UI.text "```haskell"
+  , UI.div # UI.set UI.text "class Monad m where"
+  , UI.div # UI.set UI.text "  return :: a -> m a"
+  , UI.div # UI.set UI.text "  (>>=)  :: m a -> (a -> m b) -> m b"
   , UI.div # UI.set UI.text "```"
   ]

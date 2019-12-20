@@ -190,8 +190,10 @@ parsePara2 s = Left $ Markdown [Para Open (parseInline s)]
 
 nextPre :: String -> String -> String -> BlockElem
 nextPre preLang preText s = case s of
-  "```" -> Pre Closed preLang $ tail preText  -- `tail` is used to remove the initial extra "\n"
-  _     -> Pre Open preLang (preText ++ "\n" ++ s)
+  "```" -> Pre Closed preLang preText
+  _     -> case preText of
+    "" -> Pre Open preLang s
+    _  -> Pre Open preLang $ preText ++ "\n" ++ s
 
 -- nextPara :: String -> BlockElem
 

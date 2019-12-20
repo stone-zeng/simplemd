@@ -58,4 +58,5 @@ blockToHtml (Olist   _ start content) = addTag' "ol" attr (concat $ map listItem
 blockToHtml (Quote   _       content) = addTag "blockquote" (concat $ map blockToHtml content)
 
 markdownToHtml :: HTML -> HTML
+-- markdownToHtml = show . parse . splitLine
 markdownToHtml = astToHtml . parse . splitLine
