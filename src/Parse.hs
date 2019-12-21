@@ -7,7 +7,6 @@ module Parse (
   , parse
   ) where
 
--- import "regex-compat-tdfa" Text.Regex
 import qualified Text.Regex as Regex
 import Text.Pretty.Simple (pPrint)
 

@@ -1,0 +1,31 @@
+cabal-version:       2.4
+
+name:                simplemd
+version:             0.1.0.0
+synopsis:            Simple Markdown editor.
+-- description:
+-- bug-reports:
+license:             MIT
+license-file:        LICENSE
+author:              Xiangdong Zeng
+maintainer:          xdzeng96@gmail.com
+-- copyright:
+-- category:
+extra-source-files:  CHANGELOG.md
+                   , README.md
+                   , static/simplemd.css
+                   , static/index.html
+
+executable simplemd
+  hs-source-dirs:    src
+  main-is:           Main.hs
+  other-modules:     Gui
+                   , Html
+                   , Parse
+                   , Svg
+  build-depends:     base ^>=4.12.0.0
+                   , pretty-simple
+                   , regex-compat-tdfa
+                   , threepenny-gui
+
+  default-language:  Haskell2010
