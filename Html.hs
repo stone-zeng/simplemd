@@ -40,8 +40,9 @@ listItemToHtml (ListBlockItem  xs) = addTag "li" (concatMap listBlockToHtml xs)
 
 blockToHtml :: BlockElem -> HTML
 blockToHtml (Para    _       content) = addTag "p" $ inlineListToHtml content
-blockToHtml (Heading _ level content) = addTag tag $ inlineListToHtml content
+blockToHtml (Heading   level content) = addTag tag $ inlineListToHtml content
   where tag = "h" ++ show level
+blockToHtml  Hrule                    = "<hr />"
 blockToHtml (Pre     _ lang  content) = addTag "pre" $ addTag' "code" attr content
   where attr = "class='lang-" ++ lang ++ "'"
 blockToHtml (Ulist   _       content) = addTag "ul" (concatMap listItemToHtml content)

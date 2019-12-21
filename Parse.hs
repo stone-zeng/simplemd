@@ -94,8 +94,6 @@ main = let f = foldl parseMarkdown $ Markdown []
     --   ]
   ]
 
---------------------------------------------------------------------------------
-
 -- TODO: support nested elements
 data ElemType = Plain
               | Code      -- ^ HTML <code>
@@ -114,7 +112,8 @@ data InlineElem = InlineElem {
 data BlockState = Open | Closed deriving (Show)
 
 data BlockElem = Para     BlockState          [InlineElem]   -- ^ HTML <p>
-               | Heading  BlockState  Int     [InlineElem]   -- ^ HTML <h1>, <h2>, ... <h6>
+               | Heading              Int     [InlineElem]   -- ^ HTML <h1>, <h2>, ... <h6>
+               | Hrule                                       -- ^ HTML <hr />
                | Pre      BlockState  String  String         -- ^ HTML <pre>
                | Ulist    BlockState          [ListItem]     -- ^ HTML <ul>
                | Olist    BlockState  Int     [ListItem]     -- ^ HTML <ol>
@@ -144,19 +143,19 @@ list1 <:> Markdown list2 = Markdown (list1 ++ list2)
 mdAppend :: [BlockElem] -> BlockElem -> Markdown
 mdAppend list e = Markdown (list ++ [e])
 
---------------------------------------------------------------------------------
+headingPattern, hrulePattern, prePattern, ulistPattern, olistPattern, quotePattern :: Regex.Regex
+headingPattern = Regex.mkRegex "^(#{1,6}) (.*)"            -- [<#>, <content>]
+hrulePattern   = Regex.mkRegex "^(-{3,}|\\*{3,}|_{3,}) *$" -- [<---|***|___>]
+prePattern     = Regex.mkRegex "^```(.*)"                  -- [<pre lang>]
+ulistPattern   = Regex.mkRegex "^\\- (.*)"                 -- [<content>]
+olistPattern   = Regex.mkRegex "^([0-9]+)\\. (.*)"         -- [<number>, <content>]
+quotePattern   = Regex.mkRegex "^> *(.*)"                  -- [<content>]
 
-headingPattern, prePattern, ulistPattern, olistPattern, quotePattern :: Regex.Regex
-headingPattern = Regex.mkRegex "^(#{1,6}) (.*)"       -- [<#>, <content>]
-prePattern     = Regex.mkRegex "^```(.*)"             -- [<pre lang>]
-ulistPattern   = Regex.mkRegex "^\\- (.*)"            -- [<content>]
-olistPattern   = Regex.mkRegex "^([0-9]+)\\. (.*)"    -- [<number>, <content>]
-quotePattern   = Regex.mkRegex "^> *(.*)"             -- [<content>]
-
-parseHeading, parsePre, parseUlist, parseOlist, parseQuote :: [String] -> BlockElem
-parseHeading result   = Heading Closed headingLevel headingText
+parseHeading, parseHrule, parsePre, parseUlist, parseOlist, parseQuote :: [String] -> BlockElem
+parseHeading result   = Heading headingLevel headingText
   where headingLevel  = length $ head result
         headingText   = parseInline $ last result
+parseHrule _          = Hrule
 parsePre result       = Pre Open preLang preText
   where preLang       = head result
         preText       = ""
@@ -178,8 +177,9 @@ generateParser pattern parser = \s -> case Regex.matchRegex pattern s of
   Just x  -> Left $ Markdown [parser x]
   Nothing -> Right s
 
-parseHeading2, parsePre2, parseUlist2, parseOlist2, parseQuote2 :: String -> MarkdownWrapper
+parseHeading2, parseHrule2, parsePre2, parseUlist2, parseOlist2, parseQuote2 :: String -> MarkdownWrapper
 parseHeading2 = generateParser headingPattern parseHeading
+parseHrule2   = generateParser hrulePattern   parseHrule
 parsePre2     = generateParser prePattern     parsePre
 parseUlist2   = generateParser ulistPattern   parseUlist
 parseOlist2   = generateParser olistPattern   parseOlist
@@ -200,6 +200,7 @@ nextPre preLang preText s = case s of
 parseMarkdown :: Markdown -> String -> Markdown
 parseMarkdown (Markdown []) s = result
   where Left result = parseHeading2 s
+                  >>= parseHrule2
                   >>= parsePre2
                   >>= parseUlist2
                   >>= parseOlist2

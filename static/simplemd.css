@@ -113,9 +113,11 @@ h2 {
   margin-bottom: 4px;
 }
 
-.md-output ol,
-.md-output ul {
-  padding-left: 1em;
+.md-output hr {
+  height: 4px;
+  margin: 24px 0;
+  background-color: #e1e4e8;
+  border: 0;
 }
 
 .md-output pre {
@@ -124,4 +126,9 @@ h2 {
 
 .md-output code {
   font-family: 'Source Code Pro', Menlo, Consolas monospace;
+}
+
+.md-output ol,
+.md-output ul {
+  padding-left: 1em;
 }
