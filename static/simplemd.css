@@ -5,16 +5,18 @@ body {
 }
 
 h1, h2 {
-  padding-left: 40px;
+  padding-left: 20px;
+  margin: 10px 0;
 }
 
 h2 {
   font-size: large;
   font-weight: 400;
+  margin: 5px 0;
 }
 
 .header-wrapper, .wrapper {
-  margin: 0 40px;
+  margin: 0 20px;
   display: flex;
 }
 
@@ -27,13 +29,13 @@ h2 {
 
 .header-input {
   flex: 50%;
-  padding: 20px 5px;
+  padding: 5px 5px;
   margin: 0;
 }
 
 .header-output {
   flex: 50%;
-  padding: 20px 20px;
+  padding: 5px 20px;
   margin: 0;
 }
 
@@ -44,18 +46,23 @@ h2 {
 }
 
 .wrapper {
-  border: 1px solid #E8E8E8;
+  border: 1px solid #eeeeee;
 }
 
 .md-input {
-  font-family: 'Source Code Pro', Consolas monospace;
-  white-space: pre-wrap;
+  font: 400 16px/1.6 'Source Code Pro', Menlo, Consolas monospace;
+  height: 600px;
+  overflow-y: auto;
+  resize: none;
   flex: 50%;
-  border-right: 1px solid #E8E8E8;
-  padding: 5px 5px;
+  border: none;
+  border-right: 1px solid #eeeeee;
+  padding: 5px;
 }
 
 .md-output {
+  height: 600px;
+  overflow-y: auto;
   flex: 50%;
   padding: 5px 20px;
 }
@@ -71,27 +78,39 @@ h2 {
 }
 
 .md-output h1 {
-  font-size: 36px;
+  font-size: 32px;
+  margin-top: 12px;
+  margin-bottom: 12px;
 }
 
 .md-output h2 {
-  font-size: 32px;
+  font-size: 28px;
+  margin-top: 12px;
+  margin-bottom: 12px;
 }
 
 .md-output h3 {
-  font-size: 28px;
+  font-size: 24px;
+  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 .md-output h4 {
-  font-size: 24px;
+  font-size: 20px;
+  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 .md-output h5 {
-  font-size: 20px;
+  font-size: 18px;
+  margin-top: 4px;
+  margin-bottom: 4px;
 }
 
 .md-output h6 {
   font-size: 16px;
+  margin-top: 4px;
+  margin-bottom: 4px;
 }
 
 .md-output ol,
@@ -99,6 +118,10 @@ h2 {
   padding-left: 1em;
 }
 
+.md-output pre {
+  white-space: pre-wrap;
+}
+
 .md-output code {
-  font-family: 'Source Code Pro', Consolas monospace;
+  font-family: 'Source Code Pro', Menlo, Consolas monospace;
 }

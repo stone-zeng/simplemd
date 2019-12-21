@@ -5,16 +5,7 @@ import qualified Text.Regex as Regex
 import Parse
 
 splitLine :: String -> [String]
-splitLine s = removeEmptyLine $ map replaceBr $ Regex.splitRegex pattern s
-  where
-    pattern = Regex.mkRegex "</div><div>|<div>|</div>"
-
-    replaceBr "<br>" = ""
-    replaceBr x = x
-
-    removeEmptyLine [] = []
-    removeEmptyLine ("":xs) = removeEmptyLine xs
-    removeEmptyLine x = if (last x == "") then removeEmptyLine (init x) else x
+splitLine = Regex.splitRegex $ Regex.mkRegex "\n"
 
 type HTML = String
 

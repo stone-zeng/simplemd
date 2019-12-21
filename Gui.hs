@@ -30,10 +30,9 @@ gui window = void $ do
               #. "header-output"
               #+ [iconPreview #. "icon"]]
 
-  mdInput <- UI.div
+  mdInput <- UI.textarea
     #. "md-input"
-    # UI.set contenteditable "true"
-    #+ initMdInput
+    # UI.set UI.value initMdInput
 
   mdOutput <- UI.div
     #. "md-output"
@@ -47,30 +46,27 @@ gui window = void $ do
     #+ map UI.element [title, description, header, wrapper]
 
   UI.on UI.valueChange mdInput $ \_ -> do
-    markdownText <- UI.get html_ mdInput
+    markdownText <- UI.get UI.value mdInput
     UI.element mdOutput
-      # UI.set html_ (markdownToHtml markdownText)
+      # UI.set html (markdownToHtml markdownText)
     UI.runFunction $ UI.ffi
       "document.querySelectorAll('pre code').forEach((e) => { hljs.highlightBlock(e); });"
 
-contenteditable :: UI.WriteAttr UI.Element String
-contenteditable = UI.mkWriteAttr $ UI.set' $ UI.attr "contenteditable"
-
-html_ :: UI.Attr UI.Element String
-html_ = UI.mkReadWriteAttr get set
+html :: UI.Attr UI.Element String
+html = UI.mkReadWriteAttr get set
   where
     get   el = UI.callFunction $ UI.ffi "$(%1).html()" el
     set v el = UI.runFunction  $ UI.ffi "$(%1).html(%2)" el v
 
-initMdInput :: [UI.UI UI.Element]
-initMdInput =
-  [ UI.div # UI.set UI.text "# Heading 1"
-  , UI.div #+ [UI.br]
-  , UI.div # UI.set UI.text "## Heading 2"
-  , UI.div #+ [UI.br]
-  , UI.div # UI.set UI.text "```haskell"
-  , UI.div # UI.set UI.text "class Monad m where"
-  , UI.div # UI.set UI.text "  return :: a -> m a"
-  , UI.div # UI.set UI.text "  (>>=)  :: m a -> (a -> m b) -> m b"
-  , UI.div # UI.set UI.text "```"
+initMdInput :: String
+initMdInput = foldr (\x y -> x ++ "\n" ++ y) ""
+  [ "# Heading 1"
+  , ""
+  , "## Heading 2"
+  , ""
+  , "```haskell"
+  , "class Monad m where"
+  , "  return :: a -> m a"
+  , "  (>>=)  :: m a -> (a -> m b) -> m b"
+  , "```"
   ]
