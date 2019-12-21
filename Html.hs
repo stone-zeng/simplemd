@@ -1,6 +1,7 @@
 module Html (splitLine, markdownToHtml) where
 
 import qualified Text.Regex as Regex
+import Text.Pretty.Simple (pShowNoColor)
 
 import Parse
 
@@ -10,7 +11,7 @@ splitLine = Regex.splitRegex $ Regex.mkRegex "\n"
 type HTML = String
 
 astToHtml :: Markdown -> HTML
-astToHtml (Markdown xs) = concat $ map blockToHtml xs
+astToHtml (Markdown xs) = concatMap blockToHtml xs
 
 addTag :: String -> String -> HTML
 addTag tag s = begin ++ s ++ end
@@ -28,14 +29,14 @@ inlineToHtml :: InlineElem -> HTML
 inlineToHtml = elemContent  -- TODO:placeholder
 
 inlineListToHtml :: [InlineElem] -> HTML
-inlineListToHtml xs = concat $ map inlineToHtml xs
+inlineListToHtml = concatMap inlineToHtml
 
 listItemToHtml :: ListItem -> HTML
 listItemToHtml (ListInlineItem xs) = addTag "li" $ inlineListToHtml xs
-listItemToHtml (ListBlockItem  xs) = addTag "li" (concat $ map listBlockToHtml xs)
+listItemToHtml (ListBlockItem  xs) = addTag "li" (concatMap listBlockToHtml xs)
   where listBlockToHtml (ListBlockPara  ys) = inlineListToHtml ys
-        listBlockToHtml (ListBlockUlist ys) = concat $ map listItemToHtml ys
-        listBlockToHtml (ListBlockOlist ys) = concat $ map listItemToHtml ys
+        listBlockToHtml (ListBlockUlist ys) = concatMap listItemToHtml ys
+        listBlockToHtml (ListBlockOlist ys) = concatMap listItemToHtml ys
 
 blockToHtml :: BlockElem -> HTML
 blockToHtml (Para    _       content) = addTag "p" $ inlineListToHtml content
@@ -43,11 +44,14 @@ blockToHtml (Heading _ level content) = addTag tag $ inlineListToHtml content
   where tag = "h" ++ show level
 blockToHtml (Pre     _ lang  content) = addTag "pre" $ addTag' "code" attr content
   where attr = "class='lang-" ++ lang ++ "'"
-blockToHtml (Ulist   _       content) = addTag "ul" (concat $ map listItemToHtml content)
-blockToHtml (Olist   _ start content) = addTag' "ol" attr (concat $ map listItemToHtml content)
+blockToHtml (Ulist   _       content) = addTag "ul" (concatMap listItemToHtml content)
+blockToHtml (Olist   _ start content) = addTag' "ol" attr (concatMap listItemToHtml content)
   where attr = "start='" ++ show start ++ "'"
-blockToHtml (Quote   _       content) = addTag "blockquote" (concat $ map blockToHtml content)
+blockToHtml (Quote   _       content) = addTag "blockquote" (concatMap blockToHtml content)
 
 markdownToHtml :: HTML -> HTML
--- markdownToHtml = show . parse . splitLine
-markdownToHtml = astToHtml . parse . splitLine
+markdownToHtml = addTag "pre" . addTag "code" . postParse . parse . splitLine
+  where postParse  = init . tail . unlines . splitLine' . santize . show . pShowNoColor
+        splitLine' = Regex.splitRegex (Regex.mkRegex "\\\\n")
+        santize x  = Regex.subRegex (Regex.mkRegex "\\\\\"") x "\""
+-- markdownToHtml = astToHtml . parse . splitLine
