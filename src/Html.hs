@@ -51,8 +51,8 @@ blockToHtml (Olist   _ start content) = addTag' "ol" attr (concatMap listItemToH
 blockToHtml (Quote   _       content) = addTag "blockquote" (concatMap blockToHtml content)
 
 markdownToHtml :: HTML -> HTML
-markdownToHtml = addTag "pre" . addTag "code" . postParse . parse . splitLine
-  where postParse  = init . tail . unlines . splitLine' . santize . show . pShowNoColor
-        splitLine' = Regex.splitRegex (Regex.mkRegex "\\\\n")
-        santize x  = Regex.subRegex (Regex.mkRegex "\\\\\"") x "\""
--- markdownToHtml = astToHtml . parse . splitLine
+-- markdownToHtml = addTag "pre" . addTag "code" . postParse . parse . splitLine
+--   where postParse  = init . tail . unlines . splitLine' . santize . show . pShowNoColor
+--         splitLine' = Regex.splitRegex (Regex.mkRegex "\\\\n")
+--         santize x  = Regex.subRegex (Regex.mkRegex "\\\\\"") x "\""
+markdownToHtml = astToHtml . parse . splitLine

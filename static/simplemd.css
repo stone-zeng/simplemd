@@ -2,6 +2,7 @@ body {
   font: 400 16px/1.6 'Avenir Next', 'Source Han Sans SC', sans-serif;
   font-feature-settings: 'kern';
   font-kerning: normal;
+  word-wrap: break-word;
 }
 
 h1, h2 {
@@ -24,7 +25,7 @@ h2 {
   font-size: small;
   font-weight: 400;
   letter-spacing: 1px;
-  color: #9E9E9E;
+  color: #9e9e9e;
 }
 
 .header-input {
@@ -131,4 +132,11 @@ h2 {
 .md-output ol,
 .md-output ul {
   padding-left: 1em;
+}
+
+.md-output blockquote {
+  color: #6a737d;
+  padding-left: 1em;
+  margin: 0;
+  border-left: .25em solid #dfe2e5;
 }

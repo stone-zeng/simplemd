@@ -5,5 +5,5 @@ import Gui
 main :: IO ()
 main = startGUI defaultConfig
   { jsCustomHTML = Just "index.html"
-  , jsStatic     = Just "static"
+  , jsStatic     = Just "../static"
   } gui
