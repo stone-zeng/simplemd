@@ -31,29 +31,18 @@ inlineToHtml = elemContent  -- TODO:placeholder
 inlineListToHtml :: [InlineElem] -> HTML
 inlineListToHtml = concatMap inlineToHtml
 
-ulistToHtml :: [ListItem] -> HTML
-ulistToHtml x = addTag  "ul"      $ concatMap listItemToHtml x
-
-olistToHtml :: Int -> [ListItem] -> HTML
-olistToHtml start x = addTag' "ol" attr $ concatMap listItemToHtml x
-  where attr = "start='" ++ show start ++ "'"
-
-listItemToHtml :: ListItem -> HTML
-listItemToHtml (ListItem xs) = addTag "li" $ concatMap listElemToHtml xs
-  where listElemToHtml (ParaInList  _       x) = inlineListToHtml x
-        listElemToHtml (UlistInList _       x) = ulistToHtml x
-        listElemToHtml (OlistInList _ start x) = olistToHtml start x
-
 blockToHtml :: BlockElem -> HTML
-blockToHtml (Para    _       content) = addTag "p" $ inlineListToHtml content
-blockToHtml (Heading   level content) = addTag tag $ inlineListToHtml content
-  where tag = "h" ++ show level
-blockToHtml  Hrule                    = "<hr />"
-blockToHtml (Pre     _ lang  content) = addTag "pre" $ addTag' "code" attr content
-  where attr = "class='lang-" ++ lang ++ "'"
-blockToHtml (Ulist   _       content) = ulistToHtml content
-blockToHtml (Olist   _ start content) = olistToHtml start content
-blockToHtml (Quote   _       content) = addTag "blockquote" $ concatMap blockToHtml content
+blockToHtml Para { elems = xs } = addTag "p" $ inlineListToHtml xs
+blockToHtml Heading { level = k, elems = xs } = addTag tag $ inlineListToHtml xs
+  where tag = "h" ++ show k
+blockToHtml Hrule = "<hr />"
+blockToHtml Pre { lang = preLang, text = preText} = addTag "pre" $ addTag' "code" attr preText
+  where attr = "class='lang-" ++ preLang ++ "'"
+blockToHtml Ulist { elems' = xs } = addTag "ul" $ concatMap blockToHtml xs
+blockToHtml Olist { start = k, elems' = xs } = addTag' "ol" attr $ concatMap blockToHtml xs
+  where attr = "start='" ++ show k ++ "'"
+blockToHtml Quote { elems' = xs } = addTag "blockquote" $ concatMap blockToHtml xs
+blockToHtml Block { elems = xs } = inlineListToHtml xs
 
 markdownToHtml :: HTML -> HTML
 -- markdownToHtml = addTag "pre" . addTag "code" . postParse . parse . splitLine
