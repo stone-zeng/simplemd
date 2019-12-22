@@ -31,12 +31,18 @@ inlineToHtml = elemContent  -- TODO:placeholder
 inlineListToHtml :: [InlineElem] -> HTML
 inlineListToHtml = concatMap inlineToHtml
 
+ulistToHtml :: [ListItem] -> HTML
+ulistToHtml x = addTag  "ul"      $ concatMap listItemToHtml x
+
+olistToHtml :: Int -> [ListItem] -> HTML
+olistToHtml start x = addTag' "ol" attr $ concatMap listItemToHtml x
+  where attr = "start='" ++ show start ++ "'"
+
 listItemToHtml :: ListItem -> HTML
-listItemToHtml (ListInlineItem xs) = addTag "li" $ inlineListToHtml xs
-listItemToHtml (ListBlockItem  xs) = addTag "li" (concatMap listBlockToHtml xs)
-  where listBlockToHtml (ListBlockPara  ys) = inlineListToHtml ys
-        listBlockToHtml (ListBlockUlist ys) = concatMap listItemToHtml ys
-        listBlockToHtml (ListBlockOlist ys) = concatMap listItemToHtml ys
+listItemToHtml (ListItem xs) = addTag "li" $ concatMap listElemToHtml xs
+  where listElemToHtml (ParaInList  _       x) = inlineListToHtml x
+        listElemToHtml (UlistInList _       x) = ulistToHtml x
+        listElemToHtml (OlistInList _ start x) = olistToHtml start x
 
 blockToHtml :: BlockElem -> HTML
 blockToHtml (Para    _       content) = addTag "p" $ inlineListToHtml content
@@ -45,10 +51,9 @@ blockToHtml (Heading   level content) = addTag tag $ inlineListToHtml content
 blockToHtml  Hrule                    = "<hr />"
 blockToHtml (Pre     _ lang  content) = addTag "pre" $ addTag' "code" attr content
   where attr = "class='lang-" ++ lang ++ "'"
-blockToHtml (Ulist   _       content) = addTag "ul" (concatMap listItemToHtml content)
-blockToHtml (Olist   _ start content) = addTag' "ol" attr (concatMap listItemToHtml content)
-  where attr = "start='" ++ show start ++ "'"
-blockToHtml (Quote   _       content) = addTag "blockquote" (concatMap blockToHtml content)
+blockToHtml (Ulist   _       content) = ulistToHtml content
+blockToHtml (Olist   _ start content) = olistToHtml start content
+blockToHtml (Quote   _       content) = addTag "blockquote" $ concatMap blockToHtml content
 
 markdownToHtml :: HTML -> HTML
 -- markdownToHtml = addTag "pre" . addTag "code" . postParse . parse . splitLine
