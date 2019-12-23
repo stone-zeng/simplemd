@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Parse (
     InlineElem (..)
   , BlockElem  (..)
@@ -14,7 +16,7 @@ parse = foldl parseMarkdown $ Markdown []
 testParse :: IO ()
 testParse = let f = foldl parseMarkdown $ Markdown []
   in pPrint $ map f [
-      ["```c"]
+      ["```python"]
     -- , ["```c", "int"]
     -- , ["```c", "int main () {", "    return 0;", "}", "```"]
     -- , ["```python", "def f:", "\tpass", "```endpython", "```"]
@@ -38,26 +40,27 @@ testParse = let f = foldl parseMarkdown $ Markdown []
   ]
 
 -- TODO: support nested elements
-data ElemType = Plain
-              | Code      -- ^ HTML <code>
-              | Emph      -- ^ HTML <em>
-              | Strong    -- ^ HTML <strong>
-              | Link Url  -- ^ HTML <a href="...">
-              | Math      -- ^ Use MathJax/KaTeX
+data ElemType =
+    Plain
+  | Code                    -- ^ HTML <code>
+  | Emph                    -- ^ HTML <em>
+  | Strong                  -- ^ HTML <strong>
+  | Link { url :: String }  -- ^ HTML <a href="...">
+  | Math                    -- ^ Use MathJax/KaTeX
   deriving (Show)
-type Url = String
 
 data InlineElem = InlineElem { elemType :: ElemType, elemContent :: String }
   deriving (Show)
 
-data BlockElem = Block   { elems :: [InlineElem] }
-               | Hrule                                                           -- ^ HTML <hr />
-               | Heading { level :: Int, elems :: [InlineElem] }                 -- ^ HTML <h1>, <h2>, ... <h6>
-               | Para    { isOpen :: Bool, elems :: [InlineElem] }               -- ^ HTML <p>
-               | Pre     { isOpen :: Bool, lang :: String, text :: String }      -- ^ HTML <pre>
-               | Ulist   { isOpen :: Bool, elems' :: [BlockElem] }               -- ^ HTML <ul>
-               | Olist   { isOpen :: Bool, start :: Int, elems' :: [BlockElem] } -- ^ HTML <ol>
-               | Quote   { isOpen :: Bool, elems' :: [BlockElem] }               -- ^ HTML <blockquote>
+data BlockElem =
+    Block   { elems :: [InlineElem] }
+  | Hrule                                                            -- ^ HTML <hr />
+  | Heading { level :: Int, elems :: [InlineElem] }                  -- ^ HTML <h1>, <h2>, ... <h6>
+  | Para    { isOpen :: Bool, elems :: [InlineElem] }                -- ^ HTML <p>
+  | Pre     { isOpen :: Bool, lang :: String, text :: String }       -- ^ HTML <pre>
+  | Ulist   { isOpen :: Bool, elems' :: [BlockElem] }                -- ^ HTML <ul>
+  | Olist   { isOpen :: Bool, start :: Int, elems' :: [BlockElem] }  -- ^ HTML <ol>
+  | Quote   { isOpen :: Bool, elems' :: [BlockElem] }                -- ^ HTML <blockquote>
   deriving (Show)
 
 newtype Markdown = Markdown [BlockElem] deriving (Show)
@@ -162,7 +165,7 @@ nextPara para s = case s of
                  >>= parseQuote in
     case result of
       Left (Markdown x) -> [Para { isOpen = True, elems = para }] ++ x
-      Right s'          -> [Para { isOpen = True, elems = para ++ parseInline ("\n" ++ s') }]
+      Right _           -> [Para { isOpen = True, elems = para ++ parseInline ("\n" ++ s) }]
 
 nextUlist :: [BlockElem] -> String -> [BlockElem]
 nextUlist xs s = case s of
@@ -175,14 +178,15 @@ nextUlist xs s = case s of
                        >>= parseQuote in
       case result of
         Left (Markdown x) -> [Ulist { isOpen = False, elems' = xs }] ++ x
-        Right s'          -> case Regex.matchRegex ulistPattern s' of
+        Right _           -> case Regex.matchRegex ulistPattern s of
           Just x  -> [Ulist {
               isOpen = True
-            , elems' = xs .+ Para { isOpen = True, elems = parseInline $ last x } }]
+            , elems' = xs .+ Block { elems = parseInline $ last x } }]
           Nothing -> [Ulist {
-              isOpen = False
-            , elems' = init xs .+ Para { isOpen = True, elems = lastItem} }]
-            where lastItem = (elems $ last xs) ++ (parseInline $ "\n" ++ s')
+              isOpen = True
+            , elems' = init xs .+ Block { elems = lastItem } }]
+            where lastItem = (elems $ last xs) ++ (parseInline $ "\n" ++ s)
+    -- TODO: indent
     _ -> undefined
 
 
@@ -210,20 +214,12 @@ parseMarkdown (Markdown []) s = result
                   >>= parsePara
 parseMarkdown (Markdown mdElements) s =
   case last mdElements of
-    Pre { isOpen = True, lang = preLang, text = preText } -> Markdown $ init mdElements ++ nextPre preLang preText s
-    Para { isOpen = True, elems = para } -> Markdown $ init mdElements ++ nextPara para s
-    Ulist { isOpen = True, elems' = xs } -> Markdown $ init mdElements ++ nextUlist xs s
-      -- case s of
-      --   "" -> init mdElements `mdAppend` Ulist Closed listItems
-      --   _  ->
-      --     -- TODO: indent
-      --     case Regex.matchRegex ulistPattern s of
-      --       Just result -> init mdElements `mdAppend` Ulist Open (listItems ++ [newListItem])
-      --         where newListItem = ListInlineItem (parseInline $ last result)
-      --       Nothing -> mdElements <:> parseMarkdown (Markdown []) s
-    Olist { isOpen = True, start = k, elems' = xs } ->
+    Pre   { isOpen = True, .. } -> Markdown $ init mdElements ++ nextPre lang text s
+    Para  { isOpen = True, .. } -> Markdown $ init mdElements ++ nextPara elems s
+    Ulist { isOpen = True, .. } -> Markdown $ init mdElements ++ nextUlist elems' s
+    Olist { isOpen = True, .. } ->
       case s of
-        "" -> Markdown $ init mdElements ++ [Olist { isOpen = False, start = k, elems' = xs }]
+        "" -> Markdown $ init mdElements ++ [Olist { isOpen = False, start = start, elems' = elems' }]
         _  ->
           undefined
           -- -- TODO: indent

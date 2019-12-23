@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Html (splitLine, markdownToHtml) where
 
 import qualified Text.Regex as Regex
@@ -32,17 +34,19 @@ inlineListToHtml :: [InlineElem] -> HTML
 inlineListToHtml = concatMap inlineToHtml
 
 blockToHtml :: BlockElem -> HTML
-blockToHtml Para { elems = xs } = addTag "p" $ inlineListToHtml xs
-blockToHtml Heading { level = k, elems = xs } = addTag tag $ inlineListToHtml xs
-  where tag = "h" ++ show k
-blockToHtml Hrule = "<hr />"
-blockToHtml Pre { lang = preLang, text = preText} = addTag "pre" $ addTag' "code" attr preText
-  where attr = "class='lang-" ++ preLang ++ "'"
-blockToHtml Ulist { elems' = xs } = addTag "ul" $ concatMap blockToHtml xs
-blockToHtml Olist { start = k, elems' = xs } = addTag' "ol" attr $ concatMap blockToHtml xs
-  where attr = "start='" ++ show k ++ "'"
-blockToHtml Quote { elems' = xs } = addTag "blockquote" $ concatMap blockToHtml xs
-blockToHtml Block { elems = xs } = inlineListToHtml xs
+blockToHtml Para    {..} = addTag "p" $ inlineListToHtml elems
+blockToHtml Heading {..} = addTag ("h" ++ show level) $ inlineListToHtml elems
+blockToHtml Hrule        = "<hr />"
+blockToHtml Pre     {..} = addTag "pre" $ addTag' "code" attr text
+  where attr = "class='lang-" ++ lang ++ "'"
+blockToHtml Ulist   {..} = addTag "ul" $ concatMap listItemToHtml elems'
+blockToHtml Olist   {..} = addTag' "ol" attr $ concatMap listItemToHtml elems'
+  where attr = "start='" ++ show start ++ "'"
+blockToHtml Quote   {..} = addTag "blockquote" $ concatMap blockToHtml elems'
+blockToHtml Block   {..} = inlineListToHtml elems
+
+listItemToHtml :: BlockElem -> HTML
+listItemToHtml = addTag "li" . blockToHtml
 
 markdownToHtml :: HTML -> HTML
 -- markdownToHtml = addTag "pre" . addTag "code" . postParse . parse . splitLine
