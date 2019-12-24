@@ -164,16 +164,46 @@ closeUlist xs = [Ulist { isOpen = False, elems' = init xs .+ lastItem }]
             Para { isOpen = True, .. } -> Para { isOpen = False, elems = elems }
             _                          -> last xs
 
-
+-- TODO: Unify code with `nextUlist`
 nextOlist :: Int -> [BlockElem] -> String -> [BlockElem]
 nextOlist k xs s = case s of
-  "" -> [Olist { isOpen = False, start = k, elems' = xs }]
-  _  -> undefined
-    -- TODO: indent
-    -- case Regex.matchRegex olistPattern s of
-    --   Just result -> init mdElements `mdAppend` Olist Open olStart (listItems ++ [newListItem])
-    --     where newListItem = ListInlineItem (parseInline $ last result)
-    --   Nothing -> mdElements <:> parseMarkdown (Markdown []) s
+  -- An empty line will close <ol>.
+  "" -> closeOlist k xs
+  _  -> case detectIndent s of
+    -- No indent afterwards.
+    -- If `s` begins with `- ...`, then append a new <li>; otherwise close the <ol>.
+    (0, _) -> let result = parseHeading s
+                       >>= parseHrule
+                       >>= parsePre
+                       >>= parseUlist
+                       >>= parseQuote in
+      case result of
+        -- Other objects will close <ol>.
+        Left (Markdown md) -> closeOlist k xs ++ md
+        Right _            -> case Regex.matchRegex olistPattern s of
+          -- Add a new <li>, close previous things.
+          -- The `start` of <ol> will not be affected by the following numbers.
+          Just x  -> [Olist { isOpen = True, start = k, elems' = init xs .+ lastItem .+ nextItem }]
+            where lastItem = case last xs of
+                    Para { isOpen = True, .. } -> Para { isOpen = False, elems = elems }
+                    _                          -> last xs
+                  nextItem = Para { isOpen = True, elems = parseInline $ last x}
+          -- Append `s` to the last <li> if this <li> ends with a <p>; otherwise close it.
+          Nothing -> [Olist { isOpen = True, start = k, elems' = init xs ++ lastItems }]
+            where lastItems = case last xs of
+                    Para { isOpen = True, .. } ->
+                      [Para { isOpen = False, elems = elems ++ (parseInline $ "\n" ++ s) }]
+                    _ ->
+                      [last xs, Para { isOpen = True, elems = parseInline s} ]
+    (indent, s') -> undefined
+
+-- | Close <ol>, as well as the last <p> element inside this <ol>.
+closeOlist :: Int -> [BlockElem] -> [BlockElem]
+closeOlist k xs = [Olist { isOpen = False, start = k, elems' = init xs .+ lastItem }]
+  where lastItem = case last xs of
+            Para { isOpen = True, .. } -> Para { isOpen = False, elems = elems }
+            _                          -> last xs
+
 
 -- | Return the number of leading spaces and the sub-string with leading spaces removed.
 detectIndent :: String -> (Int, String)
@@ -302,9 +332,9 @@ test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])
     -- , ["```python", "def f:", "\tpass", "```endpython", "```"]
     -- , ["```python", "def f:", "\tpass", "```", "something after", "more thing after"]
     -- , ["# Title", "```python", "# Comment", "def f:", "\tpass", "```", "something after", "## title2"]
-    -- , ["Word1", "Word2", "Word3"]
+    , ["Word1", "Word2", "Word3"]
     -- , ["text", "text", "- list1", "- list2", "  - indent", "- item next", "text3"]
-    -- , ["Text", "- ul1", "- ul2", "- ul3", "1. ol1", "2. ol2", "1. ol3", "- ul another", "3. ol another"]
+    , ["Text", "- ul1", "- ul2", "- ul3", "1. ol1", "2. ol2", "1. ol3", "- ul another", "3. ol another"]
     -- , ["> quote"]
     -- , [">q"]
     -- , [">> dq"]
