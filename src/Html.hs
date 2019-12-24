@@ -34,7 +34,7 @@ blockToHtml Ulist   {..} = addTag "ul" $ concatMap listItemToHtml elems'
 blockToHtml Olist   {..} = addTag' "ol" attr $ concatMap listItemToHtml elems'
   where attr = "start='" ++ show start ++ "'"
 blockToHtml Quote   {..} = addTag "blockquote" $ concatMap blockToHtml elems'
-blockToHtml Block   {..} = inlineToHtml elems
+-- blockToHtml Block   {..} = inlineToHtml elems
 
 -- | Add HTML tag: `something` -> `<tag>something</tag>`.
 addTag :: String -> String -> HTML
@@ -54,4 +54,6 @@ inlineToHtml :: [InlineElem] -> HTML
 inlineToHtml = concatMap elemContent  -- TODO:placeholder
 
 listItemToHtml :: BlockElem -> HTML
-listItemToHtml = addTag "li" . blockToHtml
+listItemToHtml x = case x of
+  Para {..} -> addTag "li" $ blockToHtml x
+  _         -> blockToHtml x

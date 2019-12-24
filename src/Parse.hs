@@ -23,8 +23,8 @@ instance Show Markdown where
 
 -- | All possible block elements in Markdown.
 data BlockElem =
-    Block   { elems :: [InlineElem] }
-  | Hrule                                                            -- ^ HTML <hr />
+    -- Block   { elems :: [InlineElem] }
+    Hrule                                                            -- ^ HTML <hr />
   | Heading { level :: Int, elems :: [InlineElem] }                  -- ^ HTML <h1>, <h2>, ... <h6>
   | Para    { isOpen :: Bool, elems :: [InlineElem] }                -- ^ HTML <p>
   | Pre     { isOpen :: Bool, lang :: String, text :: String }       -- ^ HTML <pre>
@@ -34,7 +34,7 @@ data BlockElem =
 
 instance Show BlockElem where
   show Hrule        = "Hrule"
-  show Block   {..} = "Block" ++ ": " ++ show elems
+  -- show Block   {..} = "Block" ++ ": " ++ show elems
   show Heading {..} = "Heading (" ++ show level ++ "): " ++ show elems
   show Para    {..} = "Para"  ++ (if isOpen then "+" else "-") ++ ": " ++ show elems
   show Ulist   {..} = "Ulist" ++ (if isOpen then "+" else "-") ++ ": " ++ show elems'
@@ -85,11 +85,13 @@ parseMarkdown (Markdown mdElements) s =
     --   case s of
     --     "" -> Markdown $ init mdElements ++ [BlockQuote quote Closed]
     --     _ -> undefined
+    {-
     Block {..} -> let nextMd = markdown $ parseMarkdown (Markdown []) s in
       case last nextMd of
         Ulist {..} -> Markdown [Ulist { isOpen = True, elems' = [Block elems] ++ elems' }]
         Olist {..} -> Markdown [Olist { isOpen = True, start = start, elems' = [Block elems] ++ elems' }]
         _          -> Markdown $ mdElements ++ nextMd
+    -}
     _ ->
       case s of
         "" -> Markdown mdElements
@@ -113,38 +115,55 @@ nextPara para s = case s of
                  >>= parseOlist
                  >>= parseQuote in
     case result of
-      Left (Markdown x) -> [Para { isOpen = True, elems = para }] ++ x
-      Right _           -> [Para { isOpen = True, elems = para ++ parseInline ("\n" ++ s) }]
+      Left (Markdown x) -> [Para { isOpen = False, elems = para }] ++ x
+      Right _           -> [Para { isOpen = True,  elems = para ++ parseInline ("\n" ++ s) }]
 
 nextUlist :: [BlockElem] -> String -> [BlockElem]
 nextUlist xs s = case s of
-  "" -> [Ulist { isOpen = False, elems' = xs }]
+  -- An empty line will close <ul>.
+  "" -> closeUlist xs
   _  -> case detectIndent s of
+    -- No indent afterwards.
+    -- If `s` begins with `- ...`, then append a new <li>; otherwise close the <ul>.
     (0, _) -> let result = parseHeading s
                        >>= parseHrule
                        >>= parsePre
                        >>= parseOlist
                        >>= parseQuote in
       case result of
-        -- Close <ul>
-        Left (Markdown x) -> [Ulist { isOpen = False, elems' = xs }] ++ x
-        Right _           -> case Regex.matchRegex ulistPattern s of
-          -- Append a new <li>
-          Just x  -> [Ulist { isOpen = True, elems' = xs .+ Block lastItem }]
-            where lastItem = parseInline $ last x
-          -- Append s to the last <li>
-          Nothing -> appendAt xs 0 (Block $ parseInline $ "\n" ++ s)
+        -- Other objects will close <ul>.
+        Left (Markdown md) -> closeUlist xs ++ md
+        Right _            -> case Regex.matchRegex ulistPattern s of
+          -- Add a new <li>, close previous things.
+          Just x  -> [Ulist { isOpen = True, elems' = init xs .+ lastItem .+ nextItem }]
+            where lastItem = case last xs of
+                    Para { isOpen = True, .. } -> Para { isOpen = False, elems = elems }
+                    _                          -> last xs
+                  nextItem = Para { isOpen = True, elems = parseInline $ last x}
+          -- Append `s` to the last <li> if this <li> ends with a <p>; otherwise close it.
+          Nothing -> [Ulist { isOpen = True, elems' = init xs ++ lastItems }]
+            where lastItems = case last xs of
+                    Para { isOpen = True, .. } ->
+                      [Para { isOpen = False, elems = elems ++ (parseInline $ "\n" ++ s) }]
+                    _ ->
+                      [last xs, Para { isOpen = True, elems = parseInline s} ]
     (indent, s') -> let indentDepth = indent `div` 2 - 1
                         depth       = detectDepth xs in
-      if 0 <= indentDepth && indentDepth <= depth
+      if 0 <= indentDepth && traceShowId indentDepth <= traceShowId depth
         then let Markdown md = parseMarkdown (Markdown [last xs]) s' in
-          case last md of
-            Para {..} -> appendAt xs indentDepth $ Block elems
+          case last $ trace ("\n[md]: " ++ show md ++ "\n") md of
+            Para {..} -> appendAt xs indentDepth $ Para True elems
             _         -> updateAt xs indentDepth $ last md
-            -- _         -> updateAt (trace ("\n--> xs: " ++ show xs) xs)
-            --                       indentDepth
-            --                       (trace ("--> x: " ++ (show $ last md)) (last md))
-        else appendAt xs depth (Block $ parseInline $ "\n" ++ s')
+        else appendAt xs depth (Para True $ parseInline $ "\n[FLAG-3]" ++ s')
+
+
+-- | Close <ul>, as well as the last <p> element inside this <ul>.
+closeUlist :: [BlockElem] -> [BlockElem]
+closeUlist xs = [Ulist { isOpen = False, elems' = init xs .+ lastItem }]
+  where lastItem = case last xs of
+            Para { isOpen = True, .. } -> Para { isOpen = False, elems = elems }
+            _                          -> last xs
+
 
 nextOlist :: Int -> [BlockElem] -> String -> [BlockElem]
 nextOlist k xs s = case s of
@@ -174,9 +193,11 @@ detectDepth xs = case last xs of
 appendAt :: [BlockElem] -> Int -> BlockElem -> [BlockElem]
 appendAt xs 0 x = [Ulist { isOpen = True, elems' = init xs ++ lastItems }]
   where lastItems = case last xs of
+                    {-
                     Block { elems = e } -> case x of
                       Block {..} -> [Block $ e ++ elems]
                       _          -> [last xs, x]
+                    -}
                     _ -> [last xs, x]
 appendAt xs k x = [Ulist { isOpen = True, elems' = init xs ++ lastItems }]
   where lastItems = appendAt (elems' $ last xs) (k - 1) x
@@ -184,9 +205,11 @@ appendAt xs k x = [Ulist { isOpen = True, elems' = init xs ++ lastItems }]
 updateAt :: [BlockElem] -> Int -> BlockElem -> [BlockElem]
 updateAt xs 0 x = [Ulist { isOpen = True, elems' = init xs ++ lastItems }]
   where lastItems = case last xs of
+                    {-
                     Block {..} -> case x of
                       Ulist {..} -> [Block $ elems, Ulist { isOpen = True, elems' = [last elems'] }]
                       _          -> [Block $ elems, x]
+                    -}
                     _ -> [x]
 updateAt xs k x = [Ulist { isOpen = True, elems' = init xs ++ lastItems }]
   where lastItems = updateAt (elems' $ last xs) (k - 1) x
@@ -247,12 +270,12 @@ preParser     result = Pre
   }
 ulistParser   result = Ulist
   { isOpen = True
-  , elems' = [Block $ parseInline $ last result]
+  , elems' = [Para { isOpen = True, elems = parseInline $ last result }]
   }
 olistParser   result = Olist
   { isOpen = True
   , start  = read $ head result
-  , elems' = [Block $ parseInline $ last result]
+  , elems' = [Para { isOpen = True, elems = parseInline $ last result }]
   }
 quoteParser   result = Quote
   { isOpen = True
@@ -291,7 +314,9 @@ test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])
     -- , ["> Quote", "> Quote cont.", "> - List in quote 1", "> - List in quote 2", "1. List", "1. List2"]
     -- , ["## Title", "# Title2", "```c", "- help", "1. First", "22. Twenty-two", "1.invalie ol", "-invalid ul", "> quote", ">> invalid quote", ">2invalid quote", "``invalid code"]
     , ["- a", "- b", "- c"]
+    , ["- First 1", "- First 2", "- First 3", "", "- Second"]
     , ["- a", "b", "- c"]
+    , ["- a", " b'", "- c"]
     , ["- a", "  ```python", "  def", "  1+1", "  ```"]
     , ["- A", "  - B"]
     , ["- a", "  - b", "  - c"]
@@ -300,12 +325,13 @@ test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])
     , ["- A", "  - B", "  - C", "D"]
     , ["- 1", "  - 2", "    - 3"]
     , ["- 1", "    - 2", "    - 3"]
+    , ["- a", "  - b", "    ccc"]
     -- , ["- 1", "  1. x", "  1. y"]  -- FIXME: Exception: Prelude.undefined
     ]
 
 test_detectDepth :: IO ()
 test_detectDepth = do
-  let item  = Block $ parseInline "a"
+  let item  = Para True (parseInline "a")
       item' = [item]
       _data = [ [ Ulist { isOpen = True, elems' = item' } ]
               , [ Ulist { isOpen = True, elems' = [ item, item ] } ]
@@ -317,7 +343,7 @@ test_detectDepth = do
 
 test_appendAt :: IO ()
 test_appendAt = do
-  let item  = Block $ parseInline "a"
+  let item  = Para True (parseInline "a")
       item' = [item]
       -- _data = [ Ulist { isOpen = True, elems' = item' }
       --         , Ulist { isOpen = True, elems' = [ item, item ] }
@@ -325,9 +351,9 @@ test_appendAt = do
       --         , Ulist { isOpen = True, elems' = [ Ulist { isOpen = False, elems' = item' }, item ] }
       --         ]
   -- pPrint _data
-  pPrint $ (\xs -> appendAt xs 1 $ Block $ parseInline "Added!") item'
-  pPrint $ (\xs -> appendAt xs 1 $ Block $ parseInline "Added!") [ item, item ]
-  pPrint $ (\xs -> appendAt xs 1 $ Block $ parseInline "Added!") [ Ulist { isOpen = True,  elems' = item' } ]
-  pPrint $ (\xs -> appendAt xs 2 $ Block $ parseInline "Added!") [ Ulist { isOpen = True,  elems' = item' } ]
+  pPrint $ (\xs -> appendAt xs 1 $ Para True (parseInline "Added!")) item'
+  pPrint $ (\xs -> appendAt xs 1 $ Para True (parseInline "Added!")) [ item, item ]
+  pPrint $ (\xs -> appendAt xs 1 $ Para True (parseInline "Added!")) [ Ulist { isOpen = True,  elems' = item' } ]
+  pPrint $ (\xs -> appendAt xs 2 $ Para True (parseInline "Added!")) [ Ulist { isOpen = True,  elems' = item' } ]
 
 #endif
