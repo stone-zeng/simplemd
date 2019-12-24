@@ -3,6 +3,8 @@
 
 module Html (markdownToHtml) where
 
+import qualified Text.Regex as Regex
+
 #ifdef DEBUG
 import Text.Pretty.Simple (pShowNoColor)
 #endif
@@ -13,7 +15,7 @@ type HTML = String
 
 markdownToHtml :: HTML -> HTML
 #ifdef DEBUG
-markdownToHtml = addTag "pre" . addTag "code" . postParse . parse . splitLine
+markdownToHtml = addTag "pre" . addTag "code" . postParse . parse . lines
   where postParse  = init . tail . unlines . splitLine' . santize . show . pShowNoColor
         splitLine' = Regex.splitRegex (Regex.mkRegex "\\\\n")
         santize x  = Regex.subRegex (Regex.mkRegex "\\\\\"") x "\""
