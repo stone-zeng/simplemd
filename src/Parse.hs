@@ -42,6 +42,14 @@ instance Show BlockElem where
   show Pre     {..} = "Pre"   ++ (if isOpen then "+" else "-") ++ " (" ++ show lang  ++ "): " ++ show text
   show Olist   {..} = "Olist" ++ (if isOpen then "+" else "-") ++ " (" ++ show start ++ "): " ++ show elems'
 
+closeBlockElem :: BlockElem -> BlockElem
+closeBlockElem Para  {..} = Para  { isOpen = False, ..}
+closeBlockElem Pre   {..} = Pre   { isOpen = False, ..}
+closeBlockElem Ulist {..} = Ulist { isOpen = False, ..}
+closeBlockElem Olist {..} = Olist { isOpen = False, ..}
+closeBlockElem Quote {..} = Quote { isOpen = False, ..}
+closeBlockElem x = x
+
 -- | All possible inline elements in Markdown.
 data InlineElem = InlineElem { elemType :: ElemType, elemContent :: String }
 
@@ -149,13 +157,72 @@ nextUlist xs s = case s of
                       [last xs, Para { isOpen = True, elems = parseInline s} ]
     (indent, s') -> let indentDepth = indent `div` 2 - 1
                         depth       = detectDepth xs in
-      if 0 <= indentDepth && traceShowId indentDepth <= traceShowId depth
-        then let Markdown md = parseMarkdown (Markdown [last xs]) s' in
-          case last $ trace ("\n[md]: " ++ show md ++ "\n") md of
-            Para {..} -> appendAt xs indentDepth $ Para True elems
-            _         -> updateAt xs indentDepth $ last md
-        else appendAt xs depth (Para True $ parseInline $ "\n[FLAG-3]" ++ s')
+      if 0 <= indentDepth && indentDepth <= depth
+        then case Regex.matchRegex ulistPattern s' of
+          -- Append element to `indentDepth` level as <ul>
+          Just x -> appendUlistTo xs indentDepth (ulistParser x)
+          _ -> case Regex.matchRegex olistPattern s' of
+            -- Append element to `indentDepth` level as <ol>
+            Just x' -> appendOlistTo xs indentDepth (olistParser x')
+            -- Append text to deepest <li>
+            _ -> appendTextTo xs depth s'
+        -- Append text to deepest <li>
+        else appendTextTo xs depth s'
 
+
+appendUlistTo :: [BlockElem] -> Int -> BlockElem -> [BlockElem]
+appendUlistTo xs 0 x = init xs .+ Ulist
+  { isOpen = True
+  , elems' = [closeBlockElem $ last xs, x]
+  }
+appendUlistTo xs k x = init xs .+ Ulist
+  { isOpen = True
+  , elems' = appendUlistTo (elems' $ last xs) (k - 1) x
+  }
+
+appendOlistTo :: [BlockElem] -> Int -> BlockElem -> [BlockElem]
+appendOlistTo xs 0 x = init xs .+ Olist
+  { isOpen = True
+  , start  = start x
+  , elems' = [closeBlockElem $ last xs, x]
+  }
+appendOlistTo xs k x = init xs .+ Olist
+  { isOpen = True
+  , start  = start x
+  , elems' = appendOlistTo (elems' $ last xs) (k - 1) x
+  }
+
+
+appendTextTo :: [BlockElem] -> Int -> String -> [BlockElem]
+appendTextTo xs 0 x = init xs .+ Para { isOpen = True, elems = (elems $ last xs) ++ parseInline x }
+appendTextTo xs k x = init xs .+ Para { isOpen = True, elems = (elems $ last xs) ++ parseInline x }
+
+-- appendTo _ _ _ = undefined
+
+-- [Ulist { isOpen = True, elems' = init xs ++ lastItems }]
+--   where lastItems = [last xs, x]
+
+
+          -- where appendToUlist = [Ulist { isOpen = True, elems' = init xs ++ lastItems }]
+          --       lastItems     = case last xs of
+          --         Para { isOpen = True, .. } ->
+          --           [Para { isOpen = True, elems = elems ++ (parseInline $ "\n[FLAG-3.1]" ++ s') }]
+          --         _ ->
+          --           [last xs, Para { isOpen = True, elems = parseInline $ "[FLAG-3.2]" ++ s'} ]
+      {-
+      if 0 <= indentDepth && {- traceShowId -} indentDepth <= {- trace ("\n<" ++ show depth ++ ">\n") -} depth
+        then let Markdown md = parseMarkdown (Markdown {- $ trace ("\n[xs]: " ++ show xs) -} xs) s' in
+          case last $ trace ("\n[md]: " ++ show md ++ "\n") md of
+            Para {..} -> [Ulist { isOpen = True, elems' = md }] -- appendAt xs indentDepth $ Para True elems
+            _         -> [Ulist { isOpen = True, elems' = md }] {- updateAt xs indentDepth $ last md -}
+        -- One-space or more-than-depth indent, treat it as normal text.
+        else [Ulist { isOpen = True, elems' = init xs ++ lastItems }]
+            where lastItems = case last xs of
+                    Para { isOpen = True, .. } ->
+                      [Para { isOpen = True, elems = elems ++ (parseInline $ "\n[FLAG-3.1]" ++ s) }]
+                    _ ->
+                      [last xs, Para { isOpen = True, elems = parseInline $ "[FLAG-3.2]" ++ s} ]
+      -}
 
 -- | Close <ul>, as well as the last <p> element inside this <ul>.
 closeUlist :: [BlockElem] -> [BlockElem]
@@ -333,30 +400,42 @@ test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])
     -- , ["```python", "def f:", "\tpass", "```", "something after", "more thing after"]
     -- , ["# Title", "```python", "# Comment", "def f:", "\tpass", "```", "something after", "## title2"]
     , ["Word1", "Word2", "Word3"]
-    -- , ["text", "text", "- list1", "- list2", "  - indent", "- item next", "text3"]
+    , ["text", "text", "- list1", "- list2", "  - indent", "- item next", "text3"]
     , ["Text", "- ul1", "- ul2", "- ul3", "1. ol1", "2. ol2", "1. ol3", "- ul another", "3. ol another"]
-    -- , ["> quote"]
-    -- , [">q"]
-    -- , [">> dq"]
-    -- , [">>dq"]
-    -- , [">"]
-    -- , [">>>"]
-    -- , ["> Quote", "> Quote cont.", "> - List in quote 1", "> - List in quote 2", "1. List", "1. List2"]
-    -- , ["## Title", "# Title2", "```c", "- help", "1. First", "22. Twenty-two", "1.invalie ol", "-invalid ul", "> quote", ">> invalid quote", ">2invalid quote", "``invalid code"]
+    , ["> quote"]
+    , [">q"]
+    , [">> dq"]
+    , [">>dq"]
+    , [">"]
+    , [">>>"]
+    , ["> Quote", "> Quote cont.", "> - List in quote 1", "> - List in quote 2", "1. List", "1. List2"]
+    , ["## Title", "# Title2", "```c", "- help", "1. First", "22. Twenty-two", "1.invalie ol", "-invalid ul", "> quote", ">> invalid quote", ">2invalid quote", "``invalid code"]
+    , ["- XXX_1"]
+    , ["- XXX_2", "  - YYY"]
+    , ["- XXX_3", "  yyy"] --
+    , ["- XXX_4", "  - YYY", "    ZZZ", "  - ww"]
+    , ["- XXX_5", "  yyy", "    - ZZZ"]
     , ["- a", "- b", "- c"]
     , ["- First 1", "- First 2", "- First 3", "", "- Second"]
     , ["- a", "b", "- c"]
     , ["- a", " b'", "- c"]
+    , ["- a", "  ```python"]
     , ["- a", "  ```python", "  def", "  1+1", "  ```"]
+    , ["- a", "  ```python", "  def", "  1+1", "  ```", "- next item"]
+    , ["- a", "  ```python", "  def", "  1+1", "  ```", "  next text"]
     , ["- A", "  - B"]
-    , ["- a", "  - b", "  - c"]
-    , ["- A1", "  BBBB"]
-    , ["- A2", "  CCCC", "- X"]
-    , ["- A", "  - B", "  - C", "D"]
-    , ["- 1", "  - 2", "    - 3"]
-    , ["- 1", "    - 2", "    - 3"]
+    , ["- a", "  - b", "  - c"] --
+    , ["- A1", "  BBBB"] --
+    , ["- A2", "  CCCC", "- X"] --
+    , ["- A", "  - B", "  - C", "D"] --
+    , ["- 1", "  - 2", "111"] --
+    , ["- 1", "  - 2", "111", "- x"] --
+    , ["- 1", "  - 2", "  222"] --
+    , ["- 1", "  - 2", "    333"] --
+    , ["- 1", "  - 2", "    - 444"] --
+    , ["- 1", "    - 2", "    - 555"] --
     , ["- a", "  - b", "    ccc"]
-    -- , ["- 1", "  1. x", "  1. y"]  -- FIXME: Exception: Prelude.undefined
+    , ["- 1", "  1. x", "  1. y"]  -- FIXME: Exception: Prelude.undefined
     ]
 
 test_detectDepth :: IO ()
