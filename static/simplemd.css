@@ -127,6 +127,8 @@ h2 {
 
 .md-output code {
   font-family: 'Source Code Pro', Menlo, Consolas monospace;
+  background: #f0f0f0;
+  padding: .1ex .2em;
 }
 
 .md-output ol,
