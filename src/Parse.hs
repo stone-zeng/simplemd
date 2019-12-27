@@ -51,25 +51,15 @@ closeBlockElem Quote {..} = Quote { isOpen = False, ..}
 closeBlockElem x = x
 
 -- | All possible inline elements in Markdown.
-data InlineElem = InlineElem { elemType :: ElemType, elemContent :: String }
+data InlineElem =
+    Plain  { content :: String }
+  | Code   { content :: String }                 -- ^ HTML <code>
+  | Emph   { content :: String }                 -- ^ HTML <em>
+  | Strong { content :: String }                 -- ^ HTML <strong>
+  | Math   { content :: String }                 -- ^ Use MathJax/KaTeX
+  | Link   { content :: String, url :: String }  -- ^ HTML <a href="...">
+  deriving (Show)
 
-instance Show InlineElem where
-  show InlineElem {..} = case elemType of
-    Plain     -> show $ "" ++ elemContent ++ ""
-    Code      -> show $ "<code>"   ++ elemContent ++ "</code>"
-    Emph      -> show $ "<em>"     ++ elemContent ++ "</em>"
-    Strong    -> show $ "<strong>" ++ elemContent ++ "</strong>"
-    Math      -> show $ "<math>"   ++ elemContent ++ "</math>"
-    Link {..} -> show $ "<a href=" ++ url ++ ">" ++ elemContent ++ "</a>"
-
--- TODO: support nested elements
-data ElemType =
-    Plain
-  | Code                    -- ^ HTML <code>
-  | Emph                    -- ^ HTML <em>
-  | Strong                  -- ^ HTML <strong>
-  | Link { url :: String }  -- ^ HTML <a href="...">
-  | Math                    -- ^ Use MathJax/KaTeX
 
 parse :: [String] -> Markdown
 parse = foldl parseMarkdown $ Markdown []
@@ -381,8 +371,30 @@ quoteParser   result = Quote
 
 
 parseInline :: String -> [InlineElem]
-parseInline s = [InlineElem {elemType = Plain, elemContent = s}]  -- TODO: placeholder
+parseInline "" = []
+parseInline s = case Regex.matchRegex codePattern s of
+  Just result -> parseInlineAux result $ Code $ result !! 1
+  Nothing     -> case Regex.matchRegex strongPattern s of
+    Just result -> parseInlineAux result $ Strong $ result !! 1
+    Nothing     -> case Regex.matchRegex emphPattern s of
+      Just result -> parseInlineAux result $ Emph $ result !! 1
+      Nothing     -> case Regex.matchRegex linkPattern s of
+        Just result -> parseInlineAux result $ Link { content = result !! 1, url = result !! 2 }
+        Nothing     -> case Regex.matchRegex autoLinkPattern s of
+          Just result -> parseInlineAux result $ Link { content = result !! 1, url = result !! 1 }
+          Nothing     -> [Plain s]
 
+
+parseInlineAux :: [String] -> InlineElem -> [InlineElem]
+parseInlineAux result e = (parseInline $ head result) ++ [e] ++ (parseInline $ last result)
+
+strongPattern, emphPattern, codePattern, linkPattern, autoLinkPattern
+  :: Regex.Regex
+strongPattern   = Regex.mkRegex "(.*)\\*\\*(.+)\\*\\*(.*)"
+emphPattern     = Regex.mkRegex "(.*)\\*(.+)\\*(.*)"
+codePattern     = Regex.mkRegex "(.*)`(.+)`(.*)"
+linkPattern     = Regex.mkRegex "(.*)\\[(.*)\\]\\(.+\\)(.*)"
+autoLinkPattern = Regex.mkRegex "(.*)<(.+)>(.*)"
 
 -- | Append element to a list.
 (.+) :: [a] -> a -> [a]

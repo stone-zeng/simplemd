@@ -13,7 +13,7 @@ import Parse
 
 type HTML = String
 
-markdownToHtml :: HTML -> HTML
+markdownToHtml :: String -> HTML
 #ifdef DEBUG
 markdownToHtml = addTag "pre" . addTag "code" . postParse . parse . lines
   where postParse  = init . tail . unlines . splitLine' . santize . show . pShowNoColor
@@ -51,7 +51,16 @@ addTag' tag attr s = begin ++ s ++ end
     end   = "</" ++ tag ++ ">"
 
 inlineToHtml :: [InlineElem] -> HTML
-inlineToHtml = concatMap elemContent  -- TODO:placeholder
+inlineToHtml [] = ""
+inlineToHtml (x:xs) = (inlineElemToHtml x) ++ inlineToHtml xs
+
+inlineElemToHtml :: InlineElem -> HTML
+inlineElemToHtml Plain  {..} = "" ++ content ++ ""
+inlineElemToHtml Code   {..} = "<code>"   ++ content ++ "</code>"
+inlineElemToHtml Emph   {..} = "<em>"     ++ content ++ "</em>"
+inlineElemToHtml Strong {..} = "<strong>" ++ content ++ "</strong>"
+inlineElemToHtml Math   {..} = "<math>"   ++ content ++ "</math>"
+inlineElemToHtml Link   {..} = "<a href=" ++ url ++ ">" ++ content ++ "</a>"
 
 listItemToHtml :: BlockElem -> HTML
 listItemToHtml x = case x of
