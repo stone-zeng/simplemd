@@ -49,8 +49,7 @@ gui window = void $ do
     markdownText <- UI.get UI.value mdInput
     UI.element mdOutput
       # UI.set html (markdownToHtml markdownText)
-    UI.runFunction $ UI.ffi
-      "document.querySelectorAll('pre code').forEach((e) => { hljs.highlightBlock(e); });"
+    UI.runFunction $ UI.ffi jsCode
 
 html :: UI.Attr UI.Element String
 html = UI.mkReadWriteAttr get set
@@ -70,3 +69,10 @@ initMdInput = foldr (\x y -> x ++ "\n" ++ y) ""
   , "  (>>=)  :: m a -> (a -> m b) -> m b"
   , "```"
   ]
+
+jsCode :: String
+jsCode = "document.querySelectorAll('pre code').forEach((e) => { hljs.highlightBlock(e); });\
+        \ renderMathInElement(document.body, {\
+        \   'delimiters':\
+        \     [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }]\
+        \ });"
