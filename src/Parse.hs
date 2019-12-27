@@ -65,7 +65,7 @@ parse :: [String] -> Markdown
 parse = foldl parseMarkdown $ Markdown []
 
 parseMarkdown :: Markdown -> String -> Markdown
-parseMarkdown (Markdown []) s = result
+parseMarkdown (Markdown []) s = Markdown [result]
   where Left result = parseHeading s
                   >>= parseHrule
                   >>= parsePre
@@ -113,8 +113,8 @@ nextPara para s = case s of
                  >>= parseOlist
                  >>= parseQuote in
     case result of
-      Left (Markdown x) -> [Para { isOpen = False, elems = para }] ++ x
-      Right _           -> [Para { isOpen = True,  elems = para ++ parseInline ("\n" ++ s) }]
+      Left  x -> [Para { isOpen = False, elems = para }] .+ x
+      Right _ -> [Para { isOpen = True,  elems = para ++ parseInline ("\n" ++ s) }]
 
 nextUlist :: [BlockElem] -> String -> [BlockElem]
 nextUlist xs s = case s of
@@ -130,8 +130,8 @@ nextUlist xs s = case s of
                        >>= parseQuote in
       case result of
         -- Other objects will close <ul>.
-        Left (Markdown md) -> closeUlist xs ++ md
-        Right _            -> case Regex.matchRegex ulistPattern s of
+        Left block -> closeUlist xs .+ block
+        Right _    -> case Regex.matchRegex ulistPattern s of
           -- Add a new <li>, close previous things.
           Just x  -> [Ulist { isOpen = True, elems' = init xs .+ lastItem .+ nextItem }]
             where lastItem = case last xs of
@@ -236,8 +236,8 @@ nextOlist k xs s = case s of
                        >>= parseQuote in
       case result of
         -- Other objects will close <ol>.
-        Left (Markdown md) -> closeOlist k xs ++ md
-        Right _            -> case Regex.matchRegex olistPattern s of
+        Left block -> closeOlist k xs .+ block
+        Right _    -> case Regex.matchRegex olistPattern s of
           -- Add a new <li>, close previous things.
           -- The `start` of <ol> will not be affected by the following numbers.
           Just x  -> [Olist { isOpen = True, start = k, elems' = init xs .+ lastItem .+ nextItem }]
@@ -315,19 +315,19 @@ atDepth xs k = iterate (elems' . last) xs !! k
 
 -- | Parse string into Markdown elements.
 parseHeading, parseHrule, parsePre, parseUlist, parseOlist, parseQuote, parsePara
-  :: String -> Either Markdown String
+  :: String -> Either BlockElem String
 parseHeading = generateParser headingPattern headingParser
 parseHrule   = generateParser hrulePattern   hruleParser
 parsePre     = generateParser prePattern     preParser
 parseUlist   = generateParser ulistPattern   ulistParser
 parseOlist   = generateParser olistPattern   olistParser
 parseQuote   = generateParser quotePattern   quoteParser
-parsePara s  = Left $ Markdown [Para { isOpen = True, elems = parseInline s }]
+parsePara s  = Left $ Para { isOpen = True, elems = parseInline s }
 
--- | Use `pattern` and `parser` to generate a parsing function.
-generateParser :: Regex.Regex -> ([String] -> BlockElem) -> (String -> Either Markdown String)
+-- | Use `pattern` and `parser` to generate a parse function.
+generateParser :: Regex.Regex -> ([String] -> a) -> (String -> Either a String)
 generateParser pattern parser = \s -> case Regex.matchRegex pattern s of
-  Just x  -> Left $ Markdown [parser x]
+  Just x  -> Left $ parser x
   Nothing -> Right s
 
 -- | Regex patterns for Markdown elements.
@@ -391,41 +391,36 @@ parseInline s = result
                   >>= parseStrong
                   >>= parseEmph
                   >>= parseLink
-                  >>= parseAuto
+                  >>= parseAutoLink
                   >>= parsePlain
 
-generateParserInline :: Regex.Regex -> ([String] -> [InlineElem]) -> (String -> Either [InlineElem] String)
-generateParserInline pattern parser = \s -> case Regex.matchRegex pattern s of
-  Just x  -> Left $ parser x
-  Nothing -> Right s
-
-parseInlineAuxCode,parseInlineAuxStrong,parseInlineAuxEmph,parseInlineAuxEmphLink,parseInlineAuxEmphAuto
+codeParser,strongParser,emphParser,emphLinkParser,emphAutoParser
   ::[String] -> [InlineElem]
-parseInlineAuxCode     result = parseInlineAux result $ Code $ result !! 1
-parseInlineAuxStrong   result = parseInlineAux result $ Strong $ result !! 1
-parseInlineAuxEmph     result = parseInlineAux result $ Emph $ result !! 1
-parseInlineAuxEmphLink result = parseInlineAux result $ Link { content = result !! 1, url = result !! 2 }
-parseInlineAuxEmphAuto result = parseInlineAux result $ Link { content = result !! 1, url = result !! 1 }
+codeParser     result = parseInlineAux result (Code   $ result !! 1)
+strongParser   result = parseInlineAux result (Strong $ result !! 1)
+emphParser     result = parseInlineAux result (Emph   $ result !! 1)
+emphLinkParser result = parseInlineAux result (Link { content = result !! 1, url = result !! 2 })
+emphAutoParser result = parseInlineAux result (Link { content = result !! 1, url = result !! 1 })
 
-parseCode,parseStrong,parseEmph,parseLink,parseAuto,parsePlain
+parseCode, parseStrong, parseEmph, parseLink, parseAutoLink, parsePlain
   :: String -> Either [InlineElem] String
-parseCode   = generateParserInline codePattern parseInlineAuxCode
-parseStrong = generateParserInline strongPattern parseInlineAuxStrong
-parseEmph   = generateParserInline emphPattern parseInlineAuxEmph
-parseLink   = generateParserInline linkPattern parseInlineAuxEmphLink
-parseAuto   = generateParserInline autoLinkPattern parseInlineAuxEmphAuto
-parsePlain s = Left $ [Plain s]
+parseCode     = generateParser codePattern     codeParser
+parseStrong   = generateParser strongPattern   strongParser
+parseEmph     = generateParser emphPattern     emphParser
+parseLink     = generateParser linkPattern     emphLinkParser
+parseAutoLink = generateParser autoLinkPattern emphAutoParser
+parsePlain s  = Left [Plain s]
 
 parseInlineAux :: [String] -> InlineElem -> [InlineElem]
 parseInlineAux result e = (parseInline $ head result) ++ [e] ++ (parseInline $ last result)
 
 strongPattern, emphPattern, codePattern, linkPattern, autoLinkPattern
   :: Regex.Regex
-strongPattern   = Regex.mkRegex "(.*)\\*\\*(.+)\\*\\*(.*)"
-emphPattern     = Regex.mkRegex "(.*)\\*(.+)\\*(.*)"
-codePattern     = Regex.mkRegex "(.*)`(.+)`(.*)"
-linkPattern     = Regex.mkRegex "(.*)\\[(.*)\\]\\(.+\\)(.*)"
-autoLinkPattern = Regex.mkRegex "(.*)<(.+)>(.*)"
+strongPattern   = Regex.mkRegex "(.*)\\*\\*(.+)\\*\\*(.*)"    -- **...**
+emphPattern     = Regex.mkRegex "(.*)\\*(.+)\\*(.*)"          -- *...*
+codePattern     = Regex.mkRegex "(.*)`(.+)`(.*)"              -- `...`
+linkPattern     = Regex.mkRegex "(.*)\\[(.*)\\]\\(.+\\)(.*)"  -- [...](...)
+autoLinkPattern = Regex.mkRegex "(.*)<(.+)>(.*)"              -- <...>
 
 -- | Append element to a list.
 (.+) :: [a] -> a -> [a]
