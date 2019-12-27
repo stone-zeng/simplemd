@@ -370,7 +370,7 @@ quoteParser   result = Quote
   }
 
 
-parseInline :: String -> [InlineElem]
+{-parseInline :: String -> [InlineElem]
 parseInline "" = []
 parseInline s = case Regex.matchRegex codePattern s of
   Just result -> parseInlineAux result $ Code $ result !! 1
@@ -382,8 +382,39 @@ parseInline s = case Regex.matchRegex codePattern s of
         Just result -> parseInlineAux result $ Link { content = result !! 1, url = result !! 2 }
         Nothing     -> case Regex.matchRegex autoLinkPattern s of
           Just result -> parseInlineAux result $ Link { content = result !! 1, url = result !! 1 }
-          Nothing     -> [Plain s]
+          Nothing     -> [Plain s]-}
 
+parseInline :: String -> [InlineElem]
+parseInline "" = []
+parseInline s = result
+  where Left result = parseCode s
+                  >>= parseStrong
+                  >>= parseEmph
+                  >>= parseLink
+                  >>= parseAuto
+                  >>= parsePlain
+
+generateParserInline :: Regex.Regex -> ([String] -> [InlineElem]) -> (String -> Either [InlineElem] String)
+generateParserInline pattern parser = \s -> case Regex.matchRegex pattern s of
+  Just x  -> Left $ parser x
+  Nothing -> Right s
+
+parseInlineAuxCode,parseInlineAuxStrong,parseInlineAuxEmph,parseInlineAuxEmphLink,parseInlineAuxEmphAuto
+  ::[String] -> [InlineElem]
+parseInlineAuxCode     result = parseInlineAux result $ Code $ result !! 1
+parseInlineAuxStrong   result = parseInlineAux result $ Strong $ result !! 1
+parseInlineAuxEmph     result = parseInlineAux result $ Emph $ result !! 1
+parseInlineAuxEmphLink result = parseInlineAux result $ Link { content = result !! 1, url = result !! 2 }
+parseInlineAuxEmphAuto result = parseInlineAux result $ Link { content = result !! 1, url = result !! 1 }
+
+parseCode,parseStrong,parseEmph,parseLink,parseAuto,parsePlain
+  :: String -> Either [InlineElem] String
+parseCode   = generateParserInline codePattern parseInlineAuxCode
+parseStrong = generateParserInline strongPattern parseInlineAuxStrong
+parseEmph   = generateParserInline emphPattern parseInlineAuxEmph
+parseLink   = generateParserInline linkPattern parseInlineAuxEmphLink
+parseAuto   = generateParserInline autoLinkPattern parseInlineAuxEmphAuto
+parsePlain s = Left $ [Plain s]
 
 parseInlineAux :: [String] -> InlineElem -> [InlineElem]
 parseInlineAux result e = (parseInline $ head result) ++ [e] ++ (parseInline $ last result)
