@@ -8,8 +8,11 @@ module Parse
   , parse
   ) where
 
+import qualified Data.Map as Map
 import qualified Text.Regex as Regex
 import Debug.Trace
+
+import Emoji
 
 #ifdef DEBUG
 import Text.Pretty.Simple (pPrint)
@@ -17,6 +20,7 @@ import Text.Pretty.Simple (pPrint)
 
 -- | Markdown AST.
 newtype Markdown = Markdown { markdown :: [BlockElem] }
+  deriving (Eq)
 
 instance Show Markdown where
   show Markdown {..} = "Markdown: " ++ show markdown
@@ -31,6 +35,7 @@ data BlockElem =
   | Ulist   { isOpen :: Bool, elems' :: [BlockElem] }                -- ^ HTML <ul>
   | Olist   { isOpen :: Bool, start :: Int, elems' :: [BlockElem] }  -- ^ HTML <ol>
   | Quote   { isOpen :: Bool, elems' :: [BlockElem] }                -- ^ HTML <blockquote>
+  deriving (Eq)
 
 instance Show BlockElem where
   show Hrule        = "Hrule"
@@ -52,13 +57,14 @@ closeBlockElem x = x
 
 -- | All possible inline elements in Markdown.
 data InlineElem =
-    Plain  { content :: String }
-  | Code   { content :: String }                 -- ^ HTML <code>
-  | Emph   { content :: String }                 -- ^ HTML <em>
-  | Strong { content :: String }                 -- ^ HTML <strong>
-  | Math   { content :: String }                 -- ^ Use MathJax/KaTeX
-  | Link   { content :: String, url :: String }  -- ^ HTML <a href="...">
-  deriving (Show)
+    Plain      { content :: String }
+  | Code       { content :: String }                 -- ^ HTML <code>
+  | Del        { content :: String }                 -- ^ HTML <del>
+  | Emph       { content :: String }                 -- ^ HTML <em>
+  | Strong     { content :: String }                 -- ^ HTML <strong>
+  | EmphStrong { content :: String }                 -- ^ HTML <em><strong>
+  | Link       { content :: String, url :: String }  -- ^ HTML <a href="...">
+  deriving (Eq, Show)
 
 
 parse :: [String] -> Markdown
@@ -388,39 +394,55 @@ parseInline :: String -> [InlineElem]
 parseInline "" = []
 parseInline s = result
   where Left result = parseCode s
+                  >>= parseEmoji
+                  >>= parseDel
+                  >>= parseEmphStrong
                   >>= parseStrong
                   >>= parseEmph
                   >>= parseLink
                   >>= parseAutoLink
                   >>= parsePlain
 
-codeParser,strongParser,emphParser,emphLinkParser,emphAutoParser
-  ::[String] -> [InlineElem]
-codeParser     result = parseInlineAux result (Code   $ result !! 1)
-strongParser   result = parseInlineAux result (Strong $ result !! 1)
-emphParser     result = parseInlineAux result (Emph   $ result !! 1)
-emphLinkParser result = parseInlineAux result (Link { content = result !! 1, url = result !! 2 })
-emphAutoParser result = parseInlineAux result (Link { content = result !! 1, url = result !! 1 })
-
 parseCode, parseStrong, parseEmph, parseLink, parseAutoLink, parsePlain
   :: String -> Either [InlineElem] String
-parseCode     = generateParser codePattern     codeParser
-parseStrong   = generateParser strongPattern   strongParser
-parseEmph     = generateParser emphPattern     emphParser
-parseLink     = generateParser linkPattern     emphLinkParser
-parseAutoLink = generateParser autoLinkPattern emphAutoParser
-parsePlain s  = Left [Plain s]
+parseCode       = generateParser codePattern       codeParser
+parseDel        = generateParser delPattern        delParser
+parseStrong     = generateParser strongPattern     strongParser
+parseEmph       = generateParser emphPattern       emphParser
+parseEmphStrong = generateParser emphStrongPattern emphStrongParser
+parseLink       = generateParser linkPattern       linkParser
+parseAutoLink   = generateParser autoLinkPattern   autoLinkParser
+parseEmoji      = generateParser emojiPattern      emojiParser
+parsePlain s    = Left [Plain s]
+
+codeParser,strongParser,emphParser,linkParser,autoLinkParser
+  ::[String] -> [InlineElem]
+codeParser       result = parseInlineAux result $ Code       { content = result !! 1 }
+delParser        result = parseInlineAux result $ Del        { content = result !! 1 }
+strongParser     result = parseInlineAux result $ Strong     { content = result !! 2 ++ result !! 3 }
+emphParser       result = parseInlineAux result $ Emph       { content = result !! 2 ++ result !! 3 }
+emphStrongParser result = parseInlineAux result $ EmphStrong { content = result !! 2 ++ result !! 3 }
+linkParser       result = parseInlineAux result $ Link       { content = result !! 1, url = result !! 2 }
+autoLinkParser   result = parseInlineAux result $ Link       { content = result !! 1, url = result !! 1 }
+emojiParser      result = parseInlineAux result $ Plain      { content = emoji }
+  where name  = result !! 1
+        emoji = case Map.lookup name emojiMap of
+          Just x  -> x
+          Nothing -> ":" ++ name ++ ":"
 
 parseInlineAux :: [String] -> InlineElem -> [InlineElem]
 parseInlineAux result e = (parseInline $ head result) ++ [e] ++ (parseInline $ last result)
 
-strongPattern, emphPattern, codePattern, linkPattern, autoLinkPattern
+strongPattern, emphPattern, emphStrongPattern, delPattern, codePattern, linkPattern, autoLinkPattern, emojiPattern
   :: Regex.Regex
-strongPattern   = Regex.mkRegex "(.*)\\*\\*(.+)\\*\\*(.*)"    -- **...**
-emphPattern     = Regex.mkRegex "(.*)\\*(.+)\\*(.*)"          -- *...*
-codePattern     = Regex.mkRegex "(.*)`(.+)`(.*)"              -- `...`
-linkPattern     = Regex.mkRegex "(.*)\\[(.*)\\]\\(.+\\)(.*)"  -- [...](...)
-autoLinkPattern = Regex.mkRegex "(.*)<(.+)>(.*)"              -- <...>
+strongPattern     = Regex.mkRegex "(.*)(\\*\\*(.+)\\*\\*|__(.+)__)(.*)"          -- **...**   | __...__
+emphPattern       = Regex.mkRegex "(.*)(\\*(.+)\\*|_(.+)_)(.*)"                  -- *...*     | _..._
+emphStrongPattern = Regex.mkRegex "(.*)(\\*\\*\\*(.+)\\*\\*\\*|___(.+)___)(.*)"  -- ***...*** | ___...___
+delPattern        = Regex.mkRegex "(.*)~~(.+)~~(.*)"                             -- ~~...~~
+codePattern       = Regex.mkRegex "(.*)`(.+)`(.*)"                               -- `...`
+linkPattern       = Regex.mkRegex "(.*)\\[(.*)\\]\\((.+)\\)(.*)"                 -- [...](...)
+autoLinkPattern   = Regex.mkRegex "(.*)<(.+)>(.*)"                               -- <...>
+emojiPattern      = Regex.mkRegex "(.*):(.+):(.*)"                               -- :...:
 
 -- | Append element to a list.
 (.+) :: [a] -> a -> [a]
@@ -437,43 +459,52 @@ test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])
     -- , ["```python", "def f:", "\tpass", "```endpython", "```"]
     -- , ["```python", "def f:", "\tpass", "```", "something after", "more thing after"]
     -- , ["# Title", "```python", "# Comment", "def f:", "\tpass", "```", "something after", "## title2"]
-    , ["Word1", "Word2", "Word3"]
-    , ["text", "text", "- list1", "- list2", "  - indent", "- item next", "text3"]
-    , ["Text", "- ul1", "- ul2", "- ul3", "1. ol1", "2. ol2", "1. ol3", "- ul another", "3. ol another"]
-    , ["> quote"]
-    , [">q"]
-    , [">> dq"]
-    , [">>dq"]
-    , [">"]
-    , [">>>"]
-    , ["> Quote", "> Quote cont.", "> - List in quote 1", "> - List in quote 2", "1. List", "1. List2"]
-    , ["## Title", "# Title2", "```c", "- help", "1. First", "22. Twenty-two", "1.invalie ol", "-invalid ul", "> quote", ">> invalid quote", ">2invalid quote", "``invalid code"]
-    , ["- XXX_1"]
-    , ["- XXX_2", "  - YYY"]
-    , ["- XXX_3", "  yyy"] --
-    , ["- XXX_4", "  - YYY", "    ZZZ", "  - ww"]
-    , ["- XXX_5", "  yyy", "    - ZZZ"]
-    , ["- a", "- b", "- c"]
-    , ["- First 1", "- First 2", "- First 3", "", "- Second"]
-    , ["- a", "b", "- c"]
-    , ["- a", " b'", "- c"]
-    , ["- a", "  ```python"]
-    , ["- a", "  ```python", "  def", "  1+1", "  ```"]
-    , ["- a", "  ```python", "  def", "  1+1", "  ```", "- next item"]
-    , ["- a", "  ```python", "  def", "  1+1", "  ```", "  next text"]
-    , ["- A", "  - B"]
-    , ["- a", "  - b", "  - c"] --
-    , ["- A1", "  BBBB"] --
-    , ["- A2", "  CCCC", "- X"] --
-    , ["- A", "  - B", "  - C", "D"] --
-    , ["- 1", "  - 2", "111"] --
-    , ["- 1", "  - 2", "111", "- x"] --
-    , ["- 1", "  - 2", "  222"] --
-    , ["- 1", "  - 2", "    333"] --
-    , ["- 1", "  - 2", "    - 444"] --
-    , ["- 1", "    - 2", "    - 555"] --
-    , ["- a", "  - b", "    ccc"]
-    , ["- 1", "  1. x", "  1. y"]  -- FIXME: Exception: Prelude.undefined
+    -- , ["Word1", "Word2", "Word3"]
+    -- , ["text", "text", "- list1", "- list2", "  - indent", "- item next", "text3"]
+    -- , ["Text", "- ul1", "- ul2", "- ul3", "1. ol1", "2. ol2", "1. ol3", "- ul another", "3. ol another"]
+    -- , ["> quote"]
+    -- , [">q"]
+    -- , [">> dq"]
+    -- , [">>dq"]
+    -- , [">"]
+    -- , [">>>"]
+    -- , ["> Quote", "> Quote cont.", "> - List in quote 1", "> - List in quote 2", "1. List", "1. List2"]
+    -- , ["## Title", "# Title2", "```c", "- help", "1. First", "22. Twenty-two", "1.invalie ol", "-invalid ul", "> quote", ">> invalid quote", ">2invalid quote", "``invalid code"]
+    -- , ["- XXX_1"]
+    -- , ["- XXX_2", "  - YYY"]
+    -- , ["- XXX_3", "  yyy"] --
+    -- , ["- XXX_4", "  - YYY", "    ZZZ", "  - ww"]
+    -- , ["- XXX_5", "  yyy", "    - ZZZ"]
+    -- , ["- a", "- b", "- c"]
+    -- , ["- First 1", "- First 2", "- First 3", "", "- Second"]
+    -- , ["- a", "b", "- c"]
+    -- , ["- a", " b'", "- c"]
+    -- , ["- a", "  ```python"]
+    -- , ["- a", "  ```python", "  def", "  1+1", "  ```"]
+    -- , ["- a", "  ```python", "  def", "  1+1", "  ```", "- next item"]
+    -- , ["- a", "  ```python", "  def", "  1+1", "  ```", "  next text"]
+    -- , ["- A", "  - B"]
+    -- , ["- a", "  - b", "  - c"] --
+    -- , ["- A1", "  BBBB"] --
+    -- , ["- A2", "  CCCC", "- X"] --
+    -- , ["- A", "  - B", "  - C", "D"] --
+    -- , ["- 1", "  - 2", "111"] --
+    -- , ["- 1", "  - 2", "111", "- x"] --
+    -- , ["- 1", "  - 2", "  222"] --
+    -- , ["- 1", "  - 2", "    333"] --
+    -- , ["- 1", "  - 2", "    - 444"] --
+    -- , ["- 1", "    - 2", "    - 555"] --
+    -- , ["- a", "  - b", "    ccc"]
+    -- , ["- 1", "  1. x", "  1. y"]  -- FIXME: Exception: Prelude.undefined
+    -- , ["*emph*"]
+    -- , ["_emph_"]
+    -- , ["``not `common`mark`` sadly"]
+    -- , ["[Fudan University](https://www.fudan.edu.cn/)"]  -- FIXME:/
+    -- , ["[Fudan University](www.fudan.edu.cn)"]
+    -- , ["[Fudan University](<https://www.fudan.edu.cn/>)"]
+    , ["***ss*** and *s1* and __s2__"]
+    , ["~~del~~"]
+    , [":bowtie: and :+1:"]
     ]
 
 test_detectDepth :: IO ()
