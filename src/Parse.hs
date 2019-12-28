@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Parse
@@ -10,6 +11,7 @@ module Parse
 
 import qualified Data.Map as Map
 import qualified Text.Regex as Regex
+import Text.RawString.QQ
 import Debug.Trace
 
 import Emoji
@@ -340,12 +342,12 @@ generateParser pattern parser = \s -> case Regex.matchRegex pattern s of
 -- Note that `<p>` does not need a pattern.
 hrulePattern, headingPattern, prePattern, ulistPattern, olistPattern, quotePattern
   :: Regex.Regex
-hrulePattern   = Regex.mkRegex "^(\\-{3,}|\\*{3,}|_{3,}) *$"  -- [(---|***|___)]
-headingPattern = Regex.mkRegex "^(#{1,6}) (.*)"               -- [(#), (content)]
-prePattern     = Regex.mkRegex "^```(.*)"                     -- [(preLang)]
-ulistPattern   = Regex.mkRegex "^(\\-|\\*|\\+) (.*)"          -- [(-|*|+), (content)]
-olistPattern   = Regex.mkRegex "^([0-9]+)\\. (.*)"            -- [(number), (content)]
-quotePattern   = Regex.mkRegex "^> *(.*)"                     -- [(content)]
+hrulePattern   = Regex.mkRegex [r|^(\-{3,}|\*{3,}|_{3,}) *$|]  -- [(---|***|___)]
+headingPattern = Regex.mkRegex [r|^(#{1,6}) (.*)|]             -- [(#), (content)]
+prePattern     = Regex.mkRegex [r|^```(.*)|]                   -- [(preLang)]
+ulistPattern   = Regex.mkRegex [r|^(-|\*|\+) (.*)|]            -- [(-|*|+), (content)]
+olistPattern   = Regex.mkRegex [r|^([0-9]+)\. (.*)|]           -- [(number), (content)]
+quotePattern   = Regex.mkRegex [r|^> *(.*)|]                   -- [(content)]
 
 -- | Parsers for Markdown elements.
 -- Note that `<p>` does not need a parser.
@@ -435,14 +437,14 @@ parseInlineAux result e = (parseInline $ head result) ++ [e] ++ (parseInline $ l
 
 strongPattern, emphPattern, emphStrongPattern, delPattern, codePattern, linkPattern, autoLinkPattern, emojiPattern
   :: Regex.Regex
-strongPattern     = Regex.mkRegex "(.*)(\\*\\*(.+)\\*\\*|__(.+)__)(.*)"          -- **...**   | __...__
-emphPattern       = Regex.mkRegex "(.*)(\\*(.+)\\*|_(.+)_)(.*)"                  -- *...*     | _..._
-emphStrongPattern = Regex.mkRegex "(.*)(\\*\\*\\*(.+)\\*\\*\\*|___(.+)___)(.*)"  -- ***...*** | ___...___
-delPattern        = Regex.mkRegex "(.*)~~(.+)~~(.*)"                             -- ~~...~~
-codePattern       = Regex.mkRegex "(.*)`(.+)`(.*)"                               -- `...`
-linkPattern       = Regex.mkRegex "(.*)\\[(.*)\\]\\((.+)\\)(.*)"                 -- [...](...)
-autoLinkPattern   = Regex.mkRegex "(.*)<(.+)>(.*)"                               -- <...>
-emojiPattern      = Regex.mkRegex "(.*):(.+):(.*)"                               -- :...:
+strongPattern     = Regex.mkRegex [r|(.*)(\*\*(.+)\*\*|__(.+)__)(.*)|]        -- **...**   | __...__
+emphPattern       = Regex.mkRegex [r|(.*)(\*(.+)\*|_(.+)_)(.*)|]              -- *...*     | _..._
+emphStrongPattern = Regex.mkRegex [r|(.*)(\*\*\*(.+)\*\*\*|___(.+)___)(.*)|]  -- ***...*** | ___...___
+delPattern        = Regex.mkRegex [r|(.*)~~(.+)~~(.*)|]                       -- ~~...~~
+codePattern       = Regex.mkRegex [r|(.*)`(.+)`(.*)|]                         -- `...`
+linkPattern       = Regex.mkRegex [r|(.*)\[(.*)\]\((.+)\)(.*)|]               -- [...](...)
+autoLinkPattern   = Regex.mkRegex [r|(.*)<(.+)>(.*)|]                         -- <...>
+emojiPattern      = Regex.mkRegex [r|(.*):(\w+?|\+1|-1):(.*)|]                -- :...:
 
 -- | Append element to a list.
 (.+) :: [a] -> a -> [a]
@@ -505,6 +507,7 @@ test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])
     , ["***ss*** and *s1* and __s2__"]
     , ["~~del~~"]
     , [":bowtie: and :+1:"]
+    , [":+1:, :-1:, are you OK:"]
     ]
 
 test_detectDepth :: IO ()

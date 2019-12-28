@@ -1,10 +1,12 @@
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Gui (gui) where
 
 import Control.Monad
 import Graphics.UI.Threepenny ((#), (#.), (#+))
 import qualified Graphics.UI.Threepenny as UI
+import Text.RawString.QQ
 
 import Html
 import Svg
@@ -58,25 +60,25 @@ html = UI.mkReadWriteAttr get set
     set v el = UI.runFunction  $ UI.ffi "$(%1).html(%2)" el v
 
 initMdInput :: String
-initMdInput = foldr (\x y -> x ++ "\n" ++ y) ""
-  [ "# Heading 1"
-  , ""
-  , "- This is a `code` span."
-  , "- We can *emphasis* and make words **strong**."
-  , "- Even math functions: $\\sin^2\\alpha+\\cos^2\\alpha=1$"
-  , ""
-  , "## Heading 2"
-  , ""
-  , "```haskell"
-  , "class Monad m where"
-  , "  return :: a -> m a"
-  , "  (>>=)  :: m a -> (a -> m b) -> m b"
-  , "```"
-  ]
+initMdInput = [r|# Heading 1
+
+- This is a `code` span.
+- We can *emphasize* and make words **strong**.
+- Even math functions: $\sin^2\alpha+\cos^2\alpha=1$
+
+## Heading 2
+
+```haskell
+class Monad m where
+  return :: a -> m a
+  (>>=)  :: m a -> (a -> m b) -> m b
+```
+|]
 
 jsCode :: String
-jsCode = "document.querySelectorAll('pre code').forEach((e) => { hljs.highlightBlock(e); });\
-        \ renderMathInElement(document.body, {\
-        \   'delimiters':\
-        \     [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }]\
-        \ });"
+jsCode = [r|document.querySelectorAll('pre code').forEach((e) => { hljs.highlightBlock(e); });
+renderMathInElement(document.body, {
+  'delimiters':
+    [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }]
+});
+|]

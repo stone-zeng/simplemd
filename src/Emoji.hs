@@ -2,6 +2,7 @@ module Emoji (emojiMap) where
 
 import qualified Data.Map as Map
 
+-- | From https://api.github.com/emojis
 emojiMap :: Map.Map String String
 emojiMap = Map.fromList
   [ ("-1",                                   "&#x1f44e;")
