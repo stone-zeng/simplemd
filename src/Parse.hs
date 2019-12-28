@@ -8,8 +8,11 @@ module Parse
   , parse
   ) where
 
+import qualified Data.Map as Map
 import qualified Text.Regex as Regex
 import Debug.Trace
+
+import Emoji
 
 #ifdef DEBUG
 import Text.Pretty.Simple (pPrint)
@@ -391,6 +394,7 @@ parseInline :: String -> [InlineElem]
 parseInline "" = []
 parseInline s = result
   where Left result = parseCode s
+                  >>= parseEmoji
                   >>= parseDel
                   >>= parseEmphStrong
                   >>= parseStrong
@@ -411,8 +415,12 @@ parseInlineAuxDel        result = parseInlineAux result $ Del        $ result !!
 parseInlineAuxStrong     result = parseInlineAux result $ Strong     $ (result !! 2 ++ result !! 3)
 parseInlineAuxEmph       result = parseInlineAux result $ Emph       $ (result !! 2 ++ result !! 3)
 parseInlineAuxEmphStrong result = parseInlineAux result $ EmphStrong $ (result !! 2 ++ result !! 3)
-parseInlineAuxEmphLink   result = parseInlineAux result $ Link { content = result !! 1, url = result !! 2 }
-parseInlineAuxEmphAuto   result = parseInlineAux result $ Link { content = result !! 1, url = result !! 1 }
+parseInlineAuxEmphLink   result = parseInlineAux result $ Link  { content = result !! 1, url = result !! 2 }
+parseInlineAuxEmphAuto   result = parseInlineAux result $ Link  { content = result !! 1, url = result !! 1 }
+parseInlineAuxEmoji      result = parseInlineAux result $ Plain { content = emoji }
+  where emoji = case Map.lookup (result !! 1) emojiMap of
+          Just x  -> x
+          Nothing -> ":" ++ result !! 1 ++ ":"
 
 parseCode, parseStrong, parseEmph, parseEmphStrong, parseLink, parseAuto, parsePlain
   :: String -> Either [InlineElem] String
@@ -423,6 +431,7 @@ parseEmph       = generateParserInline emphPattern       parseInlineAuxEmph
 parseEmphStrong = generateParserInline emphStrongPattern parseInlineAuxEmphStrong
 parseLink       = generateParserInline linkPattern       parseInlineAuxEmphLink
 parseAuto       = generateParserInline autoLinkPattern   parseInlineAuxEmphAuto
+parseEmoji      = generateParserInline emojiPattern      parseInlineAuxEmoji
 parsePlain s    = Left $ [Plain s]
 
 parseInlineAux :: [String] -> InlineElem -> [InlineElem]
@@ -437,6 +446,7 @@ emphStrongPattern = Regex.mkRegex "(.*)(\\*\\*\\*(.+)\\*\\*\\*|___(.+)___)(.*)"
 codePattern       = Regex.mkRegex "(.*)`(.+)`(.*)"
 linkPattern       = Regex.mkRegex "(.*)\\[(.*)\\]\\((.+)\\)(.*)"
 autoLinkPattern   = Regex.mkRegex "(.*)<(.+)>(.*)"
+emojiPattern      = Regex.mkRegex "(.*):(.+):(.*)"
 
 -- | Append element to a list.
 (.+) :: [a] -> a -> [a]
@@ -498,6 +508,7 @@ test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])
     -- , ["[Fudan University](<https://www.fudan.edu.cn/>)"]
     , ["***ss*** and *s1* and __s2__"]
     , ["~~del~~"]
+    , [":bowtie: and :+1:"]
     ]
 
 test_detectDepth :: IO ()

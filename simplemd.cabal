@@ -19,8 +19,10 @@ extra-source-files:  CHANGELOG.md
 library
   exposed-modules:   Html
                    , Parse
+                   , Emoji
   hs-source-dirs:    src
   build-depends:     base ^>=4.12.0.0
+                   , containers
                    , regex-compat-tdfa
   default-language:  Haskell2010
 
