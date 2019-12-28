@@ -55,12 +55,13 @@ inlineToHtml [] = ""
 inlineToHtml (x:xs) = (inlineElemToHtml x) ++ inlineToHtml xs
 
 inlineElemToHtml :: InlineElem -> HTML
-inlineElemToHtml Plain  {..} = "" ++ content ++ ""
-inlineElemToHtml Code   {..} = "<code>"   ++ content ++ "</code>"
-inlineElemToHtml Emph   {..} = "<em>"     ++ content ++ "</em>"
-inlineElemToHtml Strong {..} = "<strong>" ++ content ++ "</strong>"
-inlineElemToHtml Math   {..} = "<math>"   ++ content ++ "</math>"
-inlineElemToHtml Link   {..} = "<a href=" ++ url ++ ">" ++ content ++ "</a>"
+inlineElemToHtml Plain      {..} = "" ++ content ++ ""
+inlineElemToHtml Code       {..} = addTag "code"   content
+inlineElemToHtml Emph       {..} = addTag "em"     content
+inlineElemToHtml Strong     {..} = addTag "strong" content
+inlineElemToHtml EmphStrong {..} = addTag "em" $ addTag "strong" content
+inlineElemToHtml Link       {..} = addTag' attr "a" content
+  where attr = "href=" ++ url
 
 listItemToHtml :: BlockElem -> HTML
 listItemToHtml x = case x of

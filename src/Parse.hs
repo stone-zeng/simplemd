@@ -54,12 +54,12 @@ closeBlockElem x = x
 
 -- | All possible inline elements in Markdown.
 data InlineElem =
-    Plain  { content :: String }
-  | Code   { content :: String }                 -- ^ HTML <code>
-  | Emph   { content :: String }                 -- ^ HTML <em>
-  | Strong { content :: String }                 -- ^ HTML <strong>
-  | Math   { content :: String }                 -- ^ Use MathJax/KaTeX
-  | Link   { content :: String, url :: String }  -- ^ HTML <a href="...">
+    Plain      { content :: String }
+  | Code       { content :: String }                 -- ^ HTML <code>
+  | Emph       { content :: String }                 -- ^ HTML <em>
+  | Strong     { content :: String }                 -- ^ HTML <strong>
+  | EmphStrong { content :: String }                 -- ^ HTML <em><strong>
+  | Link       { content :: String, url :: String }  -- ^ HTML <a href="...">
   deriving (Eq, Show)
 
 
@@ -390,6 +390,7 @@ parseInline :: String -> [InlineElem]
 parseInline "" = []
 parseInline s = result
   where Left result = parseCode s
+                  >>= parseEmphStrong
                   >>= parseStrong
                   >>= parseEmph
                   >>= parseLink
@@ -403,31 +404,34 @@ generateParserInline pattern parser = \s -> case Regex.matchRegex pattern s of
 
 parseInlineAuxCode,parseInlineAuxStrong,parseInlineAuxEmph,parseInlineAuxEmphLink,parseInlineAuxEmphAuto
   ::[String] -> [InlineElem]
-parseInlineAuxCode     result = parseInlineAux result $ Code   $ result !! 1
-parseInlineAuxStrong   result = parseInlineAux result $ Strong $ (result !! 2 ++ result !! 3)
-parseInlineAuxEmph     result = parseInlineAux result $ Emph   $ (result !! 2 ++ result !! 3)
-parseInlineAuxEmphLink result = parseInlineAux result $ Link { content = result !! 1, url = result !! 2 }
-parseInlineAuxEmphAuto result = parseInlineAux result $ Link { content = result !! 1, url = result !! 1 }
+parseInlineAuxCode       result = parseInlineAux result $ Code       $ result !! 1
+parseInlineAuxStrong     result = parseInlineAux result $ Strong     $ (result !! 2 ++ result !! 3)
+parseInlineAuxEmph       result = parseInlineAux result $ Emph       $ (result !! 2 ++ result !! 3)
+parseInlineAuxEmphStrong result = parseInlineAux result $ EmphStrong $ (result !! 2 ++ result !! 3)
+parseInlineAuxEmphLink   result = parseInlineAux result $ Link { content = result !! 1, url = result !! 2 }
+parseInlineAuxEmphAuto   result = parseInlineAux result $ Link { content = result !! 1, url = result !! 1 }
 
-parseCode,parseStrong,parseEmph,parseLink,parseAuto,parsePlain
+parseCode, parseStrong, parseEmph, parseEmphStrong, parseLink, parseAuto, parsePlain
   :: String -> Either [InlineElem] String
-parseCode   = generateParserInline codePattern     parseInlineAuxCode
-parseStrong = generateParserInline strongPattern   parseInlineAuxStrong
-parseEmph   = generateParserInline emphPattern     parseInlineAuxEmph
-parseLink   = generateParserInline linkPattern     parseInlineAuxEmphLink
-parseAuto   = generateParserInline autoLinkPattern parseInlineAuxEmphAuto
-parsePlain s = Left $ [Plain s]
+parseCode       = generateParserInline codePattern       parseInlineAuxCode
+parseStrong     = generateParserInline strongPattern     parseInlineAuxStrong
+parseEmph       = generateParserInline emphPattern       parseInlineAuxEmph
+parseEmphStrong = generateParserInline emphStrongPattern parseInlineAuxEmphStrong
+parseLink       = generateParserInline linkPattern       parseInlineAuxEmphLink
+parseAuto       = generateParserInline autoLinkPattern   parseInlineAuxEmphAuto
+parsePlain s    = Left $ [Plain s]
 
 parseInlineAux :: [String] -> InlineElem -> [InlineElem]
 parseInlineAux result e = (parseInline $ head result) ++ [e] ++ (parseInline $ last result)
 
-strongPattern, emphPattern, codePattern, linkPattern, autoLinkPattern
+strongPattern, emphPattern, emphStrongPattern, codePattern, linkPattern, autoLinkPattern
   :: Regex.Regex
-strongPattern   = Regex.mkRegex "(.*)(\\*\\*(.+)\\*\\*|__(.+)__)(.*)"
-emphPattern     = Regex.mkRegex "(.*)(\\*(.+)\\*|_(.+)_)(.*)"
-codePattern     = Regex.mkRegex "(.*)`(.+)`(.*)"
-linkPattern     = Regex.mkRegex "(.*)\\[(.*)\\]\\((.+)\\)(.*)"
-autoLinkPattern = Regex.mkRegex "(.*)<(.+)>(.*)"
+strongPattern     = Regex.mkRegex "(.*)(\\*\\*(.+)\\*\\*|__(.+)__)(.*)"
+emphPattern       = Regex.mkRegex "(.*)(\\*(.+)\\*|_(.+)_)(.*)"
+emphStrongPattern = Regex.mkRegex "(.*)(\\*\\*\\*(.+)\\*\\*\\*|___(.+)___)(.*)"
+codePattern       = Regex.mkRegex "(.*)`(.+)`(.*)"
+linkPattern       = Regex.mkRegex "(.*)\\[(.*)\\]\\((.+)\\)(.*)"
+autoLinkPattern   = Regex.mkRegex "(.*)<(.+)>(.*)"
 
 -- | Append element to a list.
 (.+) :: [a] -> a -> [a]
@@ -444,49 +448,50 @@ test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])
     -- , ["```python", "def f:", "\tpass", "```endpython", "```"]
     -- , ["```python", "def f:", "\tpass", "```", "something after", "more thing after"]
     -- , ["# Title", "```python", "# Comment", "def f:", "\tpass", "```", "something after", "## title2"]
-    , ["Word1", "Word2", "Word3"]
-    , ["text", "text", "- list1", "- list2", "  - indent", "- item next", "text3"]
-    , ["Text", "- ul1", "- ul2", "- ul3", "1. ol1", "2. ol2", "1. ol3", "- ul another", "3. ol another"]
-    , ["> quote"]
-    , [">q"]
-    , [">> dq"]
-    , [">>dq"]
-    , [">"]
-    , [">>>"]
-    , ["> Quote", "> Quote cont.", "> - List in quote 1", "> - List in quote 2", "1. List", "1. List2"]
-    , ["## Title", "# Title2", "```c", "- help", "1. First", "22. Twenty-two", "1.invalie ol", "-invalid ul", "> quote", ">> invalid quote", ">2invalid quote", "``invalid code"]
-    , ["- XXX_1"]
-    , ["- XXX_2", "  - YYY"]
-    , ["- XXX_3", "  yyy"] --
-    , ["- XXX_4", "  - YYY", "    ZZZ", "  - ww"]
-    , ["- XXX_5", "  yyy", "    - ZZZ"]
-    , ["- a", "- b", "- c"]
-    , ["- First 1", "- First 2", "- First 3", "", "- Second"]
-    , ["- a", "b", "- c"]
-    , ["- a", " b'", "- c"]
-    , ["- a", "  ```python"]
-    , ["- a", "  ```python", "  def", "  1+1", "  ```"]
-    , ["- a", "  ```python", "  def", "  1+1", "  ```", "- next item"]
-    , ["- a", "  ```python", "  def", "  1+1", "  ```", "  next text"]
-    , ["- A", "  - B"]
-    , ["- a", "  - b", "  - c"] --
-    , ["- A1", "  BBBB"] --
-    , ["- A2", "  CCCC", "- X"] --
-    , ["- A", "  - B", "  - C", "D"] --
-    , ["- 1", "  - 2", "111"] --
-    , ["- 1", "  - 2", "111", "- x"] --
-    , ["- 1", "  - 2", "  222"] --
-    , ["- 1", "  - 2", "    333"] --
-    , ["- 1", "  - 2", "    - 444"] --
-    , ["- 1", "    - 2", "    - 555"] --
-    , ["- a", "  - b", "    ccc"]
-    , ["- 1", "  1. x", "  1. y"]  -- FIXME: Exception: Prelude.undefined
-    , ["*emph*"]
-    , ["_emph_"]
-    , ["``not `common`mark`` sadly"]
-    , ["[Fudan University](https://www.fudan.edu.cn/)"]  -- FIXME:/
-    , ["[Fudan University](www.fudan.edu.cn)"]
-    , ["[Fudan University](<https://www.fudan.edu.cn/>)"]
+    -- , ["Word1", "Word2", "Word3"]
+    -- , ["text", "text", "- list1", "- list2", "  - indent", "- item next", "text3"]
+    -- , ["Text", "- ul1", "- ul2", "- ul3", "1. ol1", "2. ol2", "1. ol3", "- ul another", "3. ol another"]
+    -- , ["> quote"]
+    -- , [">q"]
+    -- , [">> dq"]
+    -- , [">>dq"]
+    -- , [">"]
+    -- , [">>>"]
+    -- , ["> Quote", "> Quote cont.", "> - List in quote 1", "> - List in quote 2", "1. List", "1. List2"]
+    -- , ["## Title", "# Title2", "```c", "- help", "1. First", "22. Twenty-two", "1.invalie ol", "-invalid ul", "> quote", ">> invalid quote", ">2invalid quote", "``invalid code"]
+    -- , ["- XXX_1"]
+    -- , ["- XXX_2", "  - YYY"]
+    -- , ["- XXX_3", "  yyy"] --
+    -- , ["- XXX_4", "  - YYY", "    ZZZ", "  - ww"]
+    -- , ["- XXX_5", "  yyy", "    - ZZZ"]
+    -- , ["- a", "- b", "- c"]
+    -- , ["- First 1", "- First 2", "- First 3", "", "- Second"]
+    -- , ["- a", "b", "- c"]
+    -- , ["- a", " b'", "- c"]
+    -- , ["- a", "  ```python"]
+    -- , ["- a", "  ```python", "  def", "  1+1", "  ```"]
+    -- , ["- a", "  ```python", "  def", "  1+1", "  ```", "- next item"]
+    -- , ["- a", "  ```python", "  def", "  1+1", "  ```", "  next text"]
+    -- , ["- A", "  - B"]
+    -- , ["- a", "  - b", "  - c"] --
+    -- , ["- A1", "  BBBB"] --
+    -- , ["- A2", "  CCCC", "- X"] --
+    -- , ["- A", "  - B", "  - C", "D"] --
+    -- , ["- 1", "  - 2", "111"] --
+    -- , ["- 1", "  - 2", "111", "- x"] --
+    -- , ["- 1", "  - 2", "  222"] --
+    -- , ["- 1", "  - 2", "    333"] --
+    -- , ["- 1", "  - 2", "    - 444"] --
+    -- , ["- 1", "    - 2", "    - 555"] --
+    -- , ["- a", "  - b", "    ccc"]
+    -- , ["- 1", "  1. x", "  1. y"]  -- FIXME: Exception: Prelude.undefined
+    -- , ["*emph*"]
+    -- , ["_emph_"]
+    -- , ["``not `common`mark`` sadly"]
+    -- , ["[Fudan University](https://www.fudan.edu.cn/)"]  -- FIXME:/
+    -- , ["[Fudan University](www.fudan.edu.cn)"]
+    -- , ["[Fudan University](<https://www.fudan.edu.cn/>)"]
+    , ["***ss*** and *s1* and __s2__"]
     ]
 
 test_detectDepth :: IO ()
