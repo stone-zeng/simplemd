@@ -57,6 +57,7 @@ inlineToHtml (x:xs) = (inlineElemToHtml x) ++ inlineToHtml xs
 inlineElemToHtml :: InlineElem -> HTML
 inlineElemToHtml Plain      {..} = "" ++ content ++ ""
 inlineElemToHtml Code       {..} = addTag "code"   content
+inlineElemToHtml Del        {..} = addTag "del"    content
 inlineElemToHtml Emph       {..} = addTag "em"     content
 inlineElemToHtml Strong     {..} = addTag "strong" content
 inlineElemToHtml EmphStrong {..} = addTag "em" $ addTag "strong" content

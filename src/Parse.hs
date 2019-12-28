@@ -56,6 +56,7 @@ closeBlockElem x = x
 data InlineElem =
     Plain      { content :: String }
   | Code       { content :: String }                 -- ^ HTML <code>
+  | Del        { content :: String }                 -- ^ HTML <del>
   | Emph       { content :: String }                 -- ^ HTML <em>
   | Strong     { content :: String }                 -- ^ HTML <strong>
   | EmphStrong { content :: String }                 -- ^ HTML <em><strong>
@@ -390,6 +391,7 @@ parseInline :: String -> [InlineElem]
 parseInline "" = []
 parseInline s = result
   where Left result = parseCode s
+                  >>= parseDel
                   >>= parseEmphStrong
                   >>= parseStrong
                   >>= parseEmph
@@ -405,6 +407,7 @@ generateParserInline pattern parser = \s -> case Regex.matchRegex pattern s of
 parseInlineAuxCode,parseInlineAuxStrong,parseInlineAuxEmph,parseInlineAuxEmphLink,parseInlineAuxEmphAuto
   ::[String] -> [InlineElem]
 parseInlineAuxCode       result = parseInlineAux result $ Code       $ result !! 1
+parseInlineAuxDel        result = parseInlineAux result $ Del        $ result !! 1
 parseInlineAuxStrong     result = parseInlineAux result $ Strong     $ (result !! 2 ++ result !! 3)
 parseInlineAuxEmph       result = parseInlineAux result $ Emph       $ (result !! 2 ++ result !! 3)
 parseInlineAuxEmphStrong result = parseInlineAux result $ EmphStrong $ (result !! 2 ++ result !! 3)
@@ -414,6 +417,7 @@ parseInlineAuxEmphAuto   result = parseInlineAux result $ Link { content = resul
 parseCode, parseStrong, parseEmph, parseEmphStrong, parseLink, parseAuto, parsePlain
   :: String -> Either [InlineElem] String
 parseCode       = generateParserInline codePattern       parseInlineAuxCode
+parseDel        = generateParserInline delPattern        parseInlineAuxDel
 parseStrong     = generateParserInline strongPattern     parseInlineAuxStrong
 parseEmph       = generateParserInline emphPattern       parseInlineAuxEmph
 parseEmphStrong = generateParserInline emphStrongPattern parseInlineAuxEmphStrong
@@ -427,6 +431,7 @@ parseInlineAux result e = (parseInline $ head result) ++ [e] ++ (parseInline $ l
 strongPattern, emphPattern, emphStrongPattern, codePattern, linkPattern, autoLinkPattern
   :: Regex.Regex
 strongPattern     = Regex.mkRegex "(.*)(\\*\\*(.+)\\*\\*|__(.+)__)(.*)"
+delPattern        = Regex.mkRegex "(.*)~~(.+)~~(.*)"
 emphPattern       = Regex.mkRegex "(.*)(\\*(.+)\\*|_(.+)_)(.*)"
 emphStrongPattern = Regex.mkRegex "(.*)(\\*\\*\\*(.+)\\*\\*\\*|___(.+)___)(.*)"
 codePattern       = Regex.mkRegex "(.*)`(.+)`(.*)"
@@ -492,6 +497,7 @@ test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])
     -- , ["[Fudan University](www.fudan.edu.cn)"]
     -- , ["[Fudan University](<https://www.fudan.edu.cn/>)"]
     , ["***ss*** and *s1* and __s2__"]
+    , ["~~del~~"]
     ]
 
 test_detectDepth :: IO ()
