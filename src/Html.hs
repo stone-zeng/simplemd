@@ -3,9 +3,8 @@
 
 module Html (markdownToHtml) where
 
-import qualified Text.Regex as Regex
-
 #ifdef DEBUG
+import qualified Text.Regex as Regex
 import Text.Pretty.Simple (pShowNoColor)
 #endif
 

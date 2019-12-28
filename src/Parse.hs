@@ -12,7 +12,7 @@ module Parse
 import qualified Data.Map as Map
 import qualified Text.Regex as Regex
 import Text.RawString.QQ
-import Debug.Trace
+-- import Debug.Trace
 
 import Emoji
 
@@ -29,7 +29,6 @@ instance Show Markdown where
 
 -- | All possible block elements in Markdown.
 data BlockElem =
-    -- Block   { elems :: [InlineElem] }
     Hrule                                                            -- ^ HTML <hr />
   | Heading { level :: Int, elems :: [InlineElem] }                  -- ^ HTML <h1>, <h2>, ... <h6>
   | Para    { isOpen :: Bool, elems :: [InlineElem] }                -- ^ HTML <p>
@@ -41,7 +40,6 @@ data BlockElem =
 
 instance Show BlockElem where
   show Hrule        = "Hrule"
-  -- show Block   {..} = "Block" ++ ": " ++ show elems
   show Heading {..} = "Heading (" ++ show level ++ "): " ++ show elems
   show Para    {..} = "Para"  ++ (if isOpen then "+" else "-") ++ ": " ++ show elems
   show Ulist   {..} = "Ulist" ++ (if isOpen then "+" else "-") ++ ": " ++ show elems'
@@ -377,35 +375,21 @@ quoteParser   result = Quote
   , elems' = [Para { isOpen = True, elems = parseInline $ head result }]
   }
 
-
-{-parseInline :: String -> [InlineElem]
-parseInline "" = []
-parseInline s = case Regex.matchRegex codePattern s of
-  Just result -> parseInlineAux result $ Code $ result !! 1
-  Nothing     -> case Regex.matchRegex strongPattern s of
-    Just result -> parseInlineAux result $ Strong $ result !! 1
-    Nothing     -> case Regex.matchRegex emphPattern s of
-      Just result -> parseInlineAux result $ Emph $ result !! 1
-      Nothing     -> case Regex.matchRegex linkPattern s of
-        Just result -> parseInlineAux result $ Link { content = result !! 1, url = result !! 2 }
-        Nothing     -> case Regex.matchRegex autoLinkPattern s of
-          Just result -> parseInlineAux result $ Link { content = result !! 1, url = result !! 1 }
-          Nothing     -> [Plain s]-}
-
+-- | Parse inline
 parseInline :: String -> [InlineElem]
 parseInline "" = []
 parseInline s = result
-  where Left result = parseCode s
+  where Left result = parseCode s      -- Should be the first
                   >>= parseEmoji
                   >>= parseDel
-                  >>= parseEmphStrong
-                  >>= parseStrong
+                  >>= parseEmphStrong  -- Should before strong and emph
+                  >>= parseStrong      -- Should before emph
                   >>= parseEmph
                   >>= parseLink
                   >>= parseAutoLink
                   >>= parsePlain
 
-parseCode, parseStrong, parseEmph, parseLink, parseAutoLink, parsePlain
+parseCode, parseDel, parseStrong, parseEmph, parseEmphStrong, parseLink, parseAutoLink, parseEmoji, parsePlain
   :: String -> Either [InlineElem] String
 parseCode       = generateParser codePattern       codeParser
 parseDel        = generateParser delPattern        delParser
@@ -417,8 +401,8 @@ parseAutoLink   = generateParser autoLinkPattern   autoLinkParser
 parseEmoji      = generateParser emojiPattern      emojiParser
 parsePlain s    = Left [Plain s]
 
-codeParser,strongParser,emphParser,linkParser,autoLinkParser
-  ::[String] -> [InlineElem]
+codeParser, delParser, strongParser, emphParser, emphStrongParser, linkParser, autoLinkParser, emojiParser
+  :: [String] -> [InlineElem]
 codeParser       result = parseInlineAux result $ Code       { content = result !! 1 }
 delParser        result = parseInlineAux result $ Del        { content = result !! 1 }
 strongParser     result = parseInlineAux result $ Strong     { content = result !! 2 ++ result !! 3 }
