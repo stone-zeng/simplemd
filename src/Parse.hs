@@ -17,6 +17,7 @@ import Text.Pretty.Simple (pPrint)
 
 -- | Markdown AST.
 newtype Markdown = Markdown { markdown :: [BlockElem] }
+  deriving (Eq)
 
 instance Show Markdown where
   show Markdown {..} = "Markdown: " ++ show markdown
@@ -31,6 +32,7 @@ data BlockElem =
   | Ulist   { isOpen :: Bool, elems' :: [BlockElem] }                -- ^ HTML <ul>
   | Olist   { isOpen :: Bool, start :: Int, elems' :: [BlockElem] }  -- ^ HTML <ol>
   | Quote   { isOpen :: Bool, elems' :: [BlockElem] }                -- ^ HTML <blockquote>
+  deriving (Eq)
 
 instance Show BlockElem where
   show Hrule        = "Hrule"
@@ -58,7 +60,7 @@ data InlineElem =
   | Strong { content :: String }                 -- ^ HTML <strong>
   | Math   { content :: String }                 -- ^ Use MathJax/KaTeX
   | Link   { content :: String, url :: String }  -- ^ HTML <a href="...">
-  deriving (Show)
+  deriving (Eq, Show)
 
 
 parse :: [String] -> Markdown
@@ -401,18 +403,18 @@ generateParserInline pattern parser = \s -> case Regex.matchRegex pattern s of
 
 parseInlineAuxCode,parseInlineAuxStrong,parseInlineAuxEmph,parseInlineAuxEmphLink,parseInlineAuxEmphAuto
   ::[String] -> [InlineElem]
-parseInlineAuxCode     result = parseInlineAux result $ Code $ result !! 1
-parseInlineAuxStrong   result = parseInlineAux result $ Strong $ result !! 1
-parseInlineAuxEmph     result = parseInlineAux result $ Emph $ result !! 1
+parseInlineAuxCode     result = parseInlineAux result $ Code   $ result !! 1
+parseInlineAuxStrong   result = parseInlineAux result $ Strong $ (result !! 2 ++ result !! 3)
+parseInlineAuxEmph     result = parseInlineAux result $ Emph   $ (result !! 2 ++ result !! 3)
 parseInlineAuxEmphLink result = parseInlineAux result $ Link { content = result !! 1, url = result !! 2 }
 parseInlineAuxEmphAuto result = parseInlineAux result $ Link { content = result !! 1, url = result !! 1 }
 
 parseCode,parseStrong,parseEmph,parseLink,parseAuto,parsePlain
   :: String -> Either [InlineElem] String
-parseCode   = generateParserInline codePattern parseInlineAuxCode
-parseStrong = generateParserInline strongPattern parseInlineAuxStrong
-parseEmph   = generateParserInline emphPattern parseInlineAuxEmph
-parseLink   = generateParserInline linkPattern parseInlineAuxEmphLink
+parseCode   = generateParserInline codePattern     parseInlineAuxCode
+parseStrong = generateParserInline strongPattern   parseInlineAuxStrong
+parseEmph   = generateParserInline emphPattern     parseInlineAuxEmph
+parseLink   = generateParserInline linkPattern     parseInlineAuxEmphLink
 parseAuto   = generateParserInline autoLinkPattern parseInlineAuxEmphAuto
 parsePlain s = Left $ [Plain s]
 
@@ -421,10 +423,10 @@ parseInlineAux result e = (parseInline $ head result) ++ [e] ++ (parseInline $ l
 
 strongPattern, emphPattern, codePattern, linkPattern, autoLinkPattern
   :: Regex.Regex
-strongPattern   = Regex.mkRegex "(.*)\\*\\*(.+)\\*\\*(.*)"
-emphPattern     = Regex.mkRegex "(.*)\\*(.+)\\*(.*)"
+strongPattern   = Regex.mkRegex "(.*)(\\*\\*(.+)\\*\\*|__(.+)__)(.*)"
+emphPattern     = Regex.mkRegex "(.*)(\\*(.+)\\*|_(.+)_)(.*)"
 codePattern     = Regex.mkRegex "(.*)`(.+)`(.*)"
-linkPattern     = Regex.mkRegex "(.*)\\[(.*)\\]\\(.+\\)(.*)"
+linkPattern     = Regex.mkRegex "(.*)\\[(.*)\\]\\((.+)\\)(.*)"
 autoLinkPattern = Regex.mkRegex "(.*)<(.+)>(.*)"
 
 -- | Append element to a list.
@@ -479,6 +481,12 @@ test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])
     , ["- 1", "    - 2", "    - 555"] --
     , ["- a", "  - b", "    ccc"]
     , ["- 1", "  1. x", "  1. y"]  -- FIXME: Exception: Prelude.undefined
+    , ["*emph*"]
+    , ["_emph_"]
+    , ["``not `common`mark`` sadly"]
+    , ["[Fudan University](https://www.fudan.edu.cn/)"]  -- FIXME:/
+    , ["[Fudan University](www.fudan.edu.cn)"]
+    , ["[Fudan University](<https://www.fudan.edu.cn/>)"]
     ]
 
 test_detectDepth :: IO ()
