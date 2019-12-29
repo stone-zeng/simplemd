@@ -65,6 +65,7 @@ data InlineElem =
   | Strong   { content :: String }                 -- ^ HTML <strong>
   | EmStrong { content :: String }                 -- ^ HTML <em><strong>
   | Link     { content :: String, url :: String }  -- ^ HTML <a href="...">
+  | Img      { alt :: String, src :: String }  -- ^ HTML <img src="..." alt="...">
   deriving (Eq, Show)
 
 
@@ -382,6 +383,7 @@ parseInline "" = []
 parseInline s = result
   where Left result = parseCode s    -- Should be the first
                   >>= parseEmoji
+                  >>= parseImg       -- Should before link
                   >>= parseLink
                   >>= parseAutoLink
                   >>= parseEmStrong  -- Should before strong and em
@@ -390,7 +392,7 @@ parseInline s = result
                   >>= parseDel
                   >>= parsePlain
 
-parseCode, parseDel, parseStrong, parseEm, parseEmStrong, parseLink, parseAutoLink, parseEmoji, parsePlain
+parseCode, parseDel, parseStrong, parseEm, parseEmStrong, parseLink, parseImg, parseAutoLink, parseEmoji, parsePlain
   :: String -> Either [InlineElem] String
 parseCode     = mkParser codePattern     parseCode_
 parseDel      = mkParser delPattern      parseDel_
@@ -398,29 +400,31 @@ parseStrong   = mkParser strongPattern   parseStrong_
 parseEm       = mkParser emPattern       parseEm_
 parseEmStrong = mkParser emStrongPattern parseEmStrong_
 parseLink     = mkParser linkPattern     parseLink_
+parseImg      = mkParser imgPattern      parseImg_
 parseAutoLink = mkParser autoLinkPattern parseAutoLink_
 parseEmoji    = mkParser emojiPattern    parseEmoji_
 parsePlain s  = Left [Plain s]
 
-parseCode_, parseDel_, parseStrong_, parseEm_, parseEmStrong_, parseLink_, parseAutoLink_, parseEmoji_
+parseCode_, parseDel_, parseStrong_, parseEm_, parseEmStrong_, parseLink_, parseImg_, parseAutoLink_, parseEmoji_
   :: [String] -> [InlineElem]
-parseCode_     result = parseInline_ result $ Code     { content = result !! 1 }
-parseDel_      result = parseInline_ result $ Del      { content = result !! 1 }
-parseStrong_   result = parseInline_ result $ Strong   { content = result !! 2 ++ result !! 3 }
-parseEm_       result = parseInline_ result $ Em       { content = result !! 2 ++ result !! 3 }
-parseEmStrong_ result = parseInline_ result $ EmStrong { content = result !! 2 ++ result !! 3 }
-parseLink_     result = parseInline_ result $ Link     { content = result !! 1, url = result !! 2 }
-parseAutoLink_ result = parseInline_ result $ Link     { content = result !! 1, url = result !! 1 }
-parseEmoji_    result = parseInline_ result $ Plain    { content = emoji }
-  where name  = result !! 1
+parseCode_     x = parseInline_ x $ Code     { content = x !! 1 }
+parseDel_      x = parseInline_ x $ Del      { content = x !! 1 }
+parseStrong_   x = parseInline_ x $ Strong   { content = x !! 2 ++ x !! 3 }
+parseEm_       x = parseInline_ x $ Em       { content = x !! 2 ++ x !! 3 }
+parseEmStrong_ x = parseInline_ x $ EmStrong { content = x !! 2 ++ x !! 3 }
+parseLink_     x = parseInline_ x $ Link     { content = x !! 1, url = x !! 2 }
+parseImg_      x = parseInline_ x $ Img      { alt     = x !! 1, src = x !! 2 }
+parseAutoLink_ x = parseInline_ x $ Link     { content = x !! 1, url = x !! 1 }
+parseEmoji_    x = parseInline_ x $ Plain    { content = emoji }
+  where name  = x !! 1
         emoji = case Map.lookup name emojiMap of
-          Just x  -> x
+          Just y  -> y
           Nothing -> ":" ++ name ++ ":"
 
 parseInline_ :: [String] -> InlineElem -> [InlineElem]
 parseInline_ result e = (parseInline $ head result) ++ [e] ++ (parseInline $ last result)
 
-strongPattern, emPattern, emStrongPattern, delPattern, codePattern, linkPattern, autoLinkPattern, emojiPattern
+strongPattern, emPattern, emStrongPattern, delPattern, codePattern, linkPattern, imgPattern, autoLinkPattern, emojiPattern
   :: Regex.Regex
 strongPattern   = Regex.mkRegex [r|(.*)(\*\*(.+)\*\*|__(.+)__)(.*)|]        -- **...**   | __...__
 emPattern       = Regex.mkRegex [r|(.*)(\*(.+)\*|_(.+)_)(.*)|]              -- *...*     | _..._
@@ -428,6 +432,7 @@ emStrongPattern = Regex.mkRegex [r|(.*)(\*\*\*(.+)\*\*\*|___(.+)___)(.*)|]  -- *
 delPattern      = Regex.mkRegex [r|(.*)~~(.+)~~(.*)|]                       -- ~~...~~
 codePattern     = Regex.mkRegex [r|(.*)`(.+)`(.*)|]                         -- `...`
 linkPattern     = Regex.mkRegex [r|(.*)\[(.*)\]\(([^ ]+)\)(.*)|]            -- [...](...)
+imgPattern      = Regex.mkRegex [r|(.*)!\[(.*)\]\(([^ ]+)\)(.*)|]           -- ![...](...)
 autoLinkPattern = Regex.mkRegex [r|(.*)<([a-z]+:[^ ]+)>(.*)|]               -- <xxx:...>
 emojiPattern    = Regex.mkRegex [r|(.*):([a-z0-9_]+|\+1|-1):(.*)|]          -- :...:
 

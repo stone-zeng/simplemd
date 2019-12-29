@@ -75,7 +75,10 @@ class Monad m where
   return :: a -> m a
   (>>=)  :: m a -> (a -> m b) -> m b
 ```
-|]
+
+### Heading 3
+
+![haskell](https://www.haskell.org/img/haskell-logo.svg)|]
 
 jsCode :: String
 jsCode = [r|document.querySelectorAll('pre code').forEach((e) => { hljs.highlightBlock(e); });
