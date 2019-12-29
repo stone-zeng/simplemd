@@ -4,7 +4,7 @@
 module Html (markdownToHtml) where
 
 #ifdef DEBUG
-import qualified Text.Regex as Regex
+import qualified "regex-compat-tdfa" Text.Regex as Regex
 import Text.Pretty.Simple (pShowNoColor)
 #endif
 

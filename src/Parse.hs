@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -10,7 +11,7 @@ module Parse
   ) where
 
 import qualified Data.Map as Map
-import qualified Text.Regex as Regex
+import qualified "regex-compat-tdfa" Text.Regex as Regex
 import Text.RawString.QQ
 -- import Debug.Trace
 
@@ -428,7 +429,7 @@ delPattern        = Regex.mkRegex [r|(.*)~~(.+)~~(.*)|]                       --
 codePattern       = Regex.mkRegex [r|(.*)`(.+)`(.*)|]                         -- `...`
 linkPattern       = Regex.mkRegex [r|(.*)\[(.*)\]\((.+)\)(.*)|]               -- [...](...)
 autoLinkPattern   = Regex.mkRegex [r|(.*)<(.+)>(.*)|]                         -- <...>
-emojiPattern      = Regex.mkRegex [r|(.*):(\w+?|\+1|-1):(.*)|]                -- :...:
+emojiPattern      = Regex.mkRegex [r|(.*):([a-z0-9_]+|\+1|-1):(.*)|]          -- :...:
 
 -- | Append element to a list.
 (.+) :: [a] -> a -> [a]
@@ -490,7 +491,9 @@ test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])
     -- , ["[Fudan University](<https://www.fudan.edu.cn/>)"]
     , ["***ss*** and *s1* and __s2__"]
     , ["~~del~~"]
-    , [":bowtie: and :+1:"]
+    , [":apple:"]
+    , [":apple: and :+1:"]
+    , [":apple: and "]
     , [":+1:, :-1:, are you OK:"]
     ]
 
