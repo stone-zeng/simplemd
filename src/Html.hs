@@ -39,15 +39,15 @@ blockToHtml Heading {..} = addTag tag $ inlineToHtml elems
 blockToHtml Hrule        = "<hr />"
 blockToHtml Pre     {..} = addTag "pre" $ addTag' "code" attr text
   where attr = "class='lang-" ++ lang ++ "'"
-blockToHtml Ulist   {..} = addTag  "ul"      $ concatMap listItemToHtml elems'
-blockToHtml Olist   {..} = addTag' "ol" attr $ concatMap listItemToHtml elems'
+blockToHtml Ulist   {..} = addTag  "ul"      $ concatMap listItemToHtml items
+blockToHtml Olist   {..} = addTag' "ol" attr $ concatMap listItemToHtml items
   where attr = "start='" ++ show start ++ "'"
 blockToHtml Quote   {..} = addTag "blockquote" $ concatMap blockToHtml elems'
 
-listItemToHtml :: BlockElem -> HTML
-listItemToHtml x = case x of
-  Para {..} -> addTag "li" $ blockToHtml x
-  _         -> blockToHtml x
+listItemToHtml :: ListItem -> HTML
+listItemToHtml = addTag "li" . concatMap blockToHtml'
+  where blockToHtml' Para {..} = inlineToHtml elems
+        blockToHtml' x = blockToHtml x
 
 inlineToHtml :: [InlineElem] -> HTML
 inlineToHtml = concatMap inlineElemToHtml

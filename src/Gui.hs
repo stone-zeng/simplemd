@@ -63,8 +63,10 @@ initMdInput :: String
 initMdInput = [r|# Heading 1
 
 - This is a `code` span
-- This is a link to [Fudan University](https://www.fudan.edu.cn/) :mortar_board:
-- Auto-link: <mailto:xdzeng18@fudan.edu.cn>
+- Links:
+  - This is a link to
+    [Fudan University](https://www.fudan.edu.cn/) :mortar_board:
+  - Auto-link: <mailto:xdzeng18@fudan.edu.cn>
 - We can *emphasize text* and make them **strong** :muscle:
 - Even math functions: $\sin^2\alpha + \cos^2\alpha = 1$
 

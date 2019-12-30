@@ -52,7 +52,7 @@ h2 {
 
 .md-input {
   font: 400 16px/1.6 'Source Code Pro', Menlo, Consolas monospace;
-  height: 600px;
+  min-height: 600px;
   overflow-y: auto;
   resize: none;
   flex: 50%;
@@ -62,7 +62,7 @@ h2 {
 }
 
 .md-output {
-  height: 600px;
+  min-height: 600px;
   overflow-y: auto;
   flex: 50%;
   padding: 5px 20px;

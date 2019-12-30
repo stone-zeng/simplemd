@@ -2,17 +2,14 @@ cabal-version:       2.4
 
 name:                simplemd
 version:             0.1.0.0
-synopsis:            Simple Markdown editor.
--- description:
--- bug-reports:
+synopsis:            A simple Markdown editor, written in Haskell.
+bug-reports:         https://github.com/stone-zeng/simplemd/issues
 license:             MIT
 license-file:        LICENSE
-author:              Xiangdong Zeng
+author:              Xiangdong Zeng, Xuyang Duan
 maintainer:          xdzeng96@gmail.com
--- copyright:
--- category:
-extra-source-files:  CHANGELOG.md
-                   , README.md
+copyright:           Copyright (c) 2019 Xiangdong Zeng and Xuyang Duan
+extra-source-files:  README.md
                    , static/simplemd.css
                    , static/index.html
 
