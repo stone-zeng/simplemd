@@ -61,7 +61,7 @@ inlineToHtml = concatMap inlineElemToHtml
     inlineElemToHtml Link     {..} = addTag' "a" attr               $ htmlSanitize content
       where attr = "href='" ++ url ++ "'"
     inlineElemToHtml Img      {..} = "<img " ++ attr ++ " />"
-      where attr = "alt='" ++ alt ++ "' src='" ++ src ++ "'"
+      where attr = "alt='" ++ content ++ "' src='" ++ url ++ "'"
 
 -- | Add HTML tag: `something` -> `<tag>something</tag>`.
 addTag :: String -> String -> HTML

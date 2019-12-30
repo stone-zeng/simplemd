@@ -23,8 +23,9 @@ library
   hs-source-dirs:    src
   build-depends:     base ^>=4.12.0.0
                    , containers
-                   , regex-compat-tdfa
+                   , directory
                    , raw-strings-qq
+                   , regex-compat-tdfa
   default-language:  Haskell2010
 
 executable simplemd
@@ -33,11 +34,14 @@ executable simplemd
   other-modules:     Gui
                    , Html
                    , Parse
+                   , Emoji
                    , Svg
   build-depends:     base ^>=4.12.0.0
+                   , containers
+                   , directory
                    , pretty-simple
-                   , regex-compat-tdfa
                    , raw-strings-qq
+                   , regex-compat-tdfa
                    , threepenny-gui
   default-language:  Haskell2010
 

@@ -65,7 +65,7 @@ data InlineElem =
   | Strong   { content :: String }                 -- ^ HTML <strong>
   | EmStrong { content :: String }                 -- ^ HTML <em><strong>
   | Link     { content :: String, url :: String }  -- ^ HTML <a href="...">
-  | Img      { alt :: String, src :: String }  -- ^ HTML <img src="..." alt="...">
+  | Img      { content :: String, url :: String }  -- ^ HTML <img src="..." alt="...">
   deriving (Eq, Show)
 
 
@@ -413,7 +413,7 @@ parseStrong_   x = parseInline_ x $ Strong   { content = x !! 2 ++ x !! 3 }
 parseEm_       x = parseInline_ x $ Em       { content = x !! 2 ++ x !! 3 }
 parseEmStrong_ x = parseInline_ x $ EmStrong { content = x !! 2 ++ x !! 3 }
 parseLink_     x = parseInline_ x $ Link     { content = x !! 1, url = x !! 2 }
-parseImg_      x = parseInline_ x $ Img      { alt     = x !! 1, src = x !! 2 }
+parseImg_      x = parseInline_ x $ Img      { content = x !! 1, url = x !! 2 }
 parseAutoLink_ x = parseInline_ x $ Link     { content = x !! 1, url = x !! 1 }
 parseEmoji_    x = parseInline_ x $ Plain    { content = emoji }
   where name  = x !! 1
