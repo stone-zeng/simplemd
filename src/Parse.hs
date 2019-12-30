@@ -28,11 +28,11 @@ myTraceId x = trace ("\nDEBUG: <" ++ show x ++ ">\n") x
 #endif
 
 -- | Markdown AST.
-newtype Markdown = Markdown { markdown :: [BlockElem] }
+newtype Markdown = Markdown { unMarkdown :: [BlockElem] }
   deriving (Eq)
 
 instance Show Markdown where
-  show Markdown {..} = "Markdown: " ++ show markdown
+  show Markdown {..} = "Markdown: " ++ show unMarkdown
 
 -- | All possible block elements in Markdown.
 data BlockElem =
@@ -68,10 +68,12 @@ closeBlockElem x = x
 data InlineElem =
     Plain    { content :: String }
   | Code     { content :: String }                 -- ^ HTML <code>
-  | Del      { content :: String }                 -- ^ HTML <del>
   | Em       { content :: String }                 -- ^ HTML <em>
   | Strong   { content :: String }                 -- ^ HTML <strong>
   | EmStrong { content :: String }                 -- ^ HTML <em><strong>
+  | Del      { content :: String }                 -- ^ HTML <del>
+  | Ins      { content :: String }                 -- ^ HTML <ins>
+  | Mark     { content :: String }                 -- ^ HTML <mark>
   | Link     { content :: String, url :: String }  -- ^ HTML <a href="...">
   | Img      { content :: String, url :: String }  -- ^ HTML <img src="..." alt="...">
   deriving (Eq, Show)
@@ -97,7 +99,7 @@ parseMarkdown (Markdown mdElements) s =
     Quote { isOpen = True, .. } -> Markdown $ init mdElements ++ nextQuote elems'      s
     _ -> Markdown $ if null s
       then mdElements
-      else mdElements ++ (markdown $ parseMarkdown (Markdown []) s)
+      else mdElements ++ (unMarkdown $ parseMarkdown (Markdown []) s)
 
 nextPre :: String -> String -> String -> [BlockElem]
 nextPre preLang preText s = case s of
@@ -128,7 +130,7 @@ nextUlist xs s = case s of
     (0, _) -> case result of
       -- Other objects will close <ul>.
       Left block -> closeUlist xs .+ block
-      Right _    -> case Regex.matchRegex ulistPattern s of
+      Right _    -> case Regex.matchRegex ulistPatt s of
         -- Add a new <li>.
         Just x  -> [Ulist { isOpen = True, items = (init xs) .+ lastItem .+ nextItem }]
           where lastItem = (init $ last xs) .+ closeBlockElem (last $ last xs)
@@ -141,7 +143,7 @@ nextUlist xs s = case s of
                  >>= parseOlist
                  >>= parseQuote
     (2, s') -> case detectDepth xs of
-      0 -> case Regex.matchRegex ulistPattern s' of
+      0 -> case Regex.matchRegex ulistPatt s' of
         -- Add a new <ul>.
         Just x  -> [Ulist { isOpen = True, items = items }]
           where items    = (init xs) .+ (lastItem .+ ulist)
@@ -151,7 +153,7 @@ nextUlist xs s = case s of
                                                     , elems  = parseInline $ last x
                                                     } ]]
                                  }
-        Nothing -> case Regex.matchRegex olistPattern s' of
+        Nothing -> case Regex.matchRegex olistPatt s' of
           -- Add a new <ol>.
           Just x  -> [Ulist { isOpen = True, items = items }]
             where items    = (init xs) .+ (lastItem .+ olist)
@@ -163,7 +165,7 @@ nextUlist xs s = case s of
                                                       } ]]
                                    }
           Nothing -> fallback
-      1 -> case Regex.matchRegex ulistPattern s' of
+      1 -> case Regex.matchRegex ulistPatt s' of
         -- Add a new <ul> inside the last <li>.
         Just x  -> [Ulist { isOpen = True, items = items' }]
           where items' = (init xs) .+ ((init $ last xs) .+ ulist)
@@ -171,7 +173,7 @@ nextUlist xs s = case s of
                                , items = (items $ last $ last xs)
                                   .+ [Para { isOpen = True, elems = parseInline $ last x }]
                                }
-        Nothing -> case Regex.matchRegex olistPattern s' of
+        Nothing -> case Regex.matchRegex olistPatt s' of
           -- Add a new <ol> inside the last <li>.
           Just x  -> [Ulist { isOpen = True, items = items' }]
             where items' = (init xs) .+ ((init $ last xs) .+ olist)
@@ -195,7 +197,7 @@ nextOlist start xs s = case s of
     (0, _) -> case result of
       -- Other objects will close <ol>.
       Left block -> closeOlist start xs .+ block
-      Right _    -> case Regex.matchRegex olistPattern s of
+      Right _    -> case Regex.matchRegex olistPatt s of
         -- Add a new <li>, do not change `start`.
         Just x  -> [Olist { isOpen = True, start = start, items = (init xs) .+ lastItem .+ nextItem }]
           where lastItem = (init $ last xs) .+ closeBlockElem (last $ last xs)
@@ -208,7 +210,7 @@ nextOlist start xs s = case s of
                  >>= parseUlist
                  >>= parseQuote
     (2, s') -> case detectDepth xs of
-      0 -> case Regex.matchRegex ulistPattern s' of
+      0 -> case Regex.matchRegex ulistPatt s' of
         -- Add a new <ul>.
         Just x  -> [Olist { isOpen = True, start = start, items = items }]
           where items    = (init xs) .+ (lastItem .+ ulist)
@@ -218,7 +220,7 @@ nextOlist start xs s = case s of
                                                     , elems  = parseInline $ last x
                                                     } ]]
                                  }
-        Nothing -> case Regex.matchRegex olistPattern s' of
+        Nothing -> case Regex.matchRegex olistPatt s' of
           -- Add a new <ol>.
           Just x  -> [Olist { isOpen = True, start = start, items = items }]
             where items    = (init xs) .+ (lastItem .+ olist)
@@ -230,7 +232,7 @@ nextOlist start xs s = case s of
                                                       } ]]
                                    }
           Nothing -> fallback
-      1 -> case Regex.matchRegex ulistPattern s' of
+      1 -> case Regex.matchRegex ulistPatt s' of
         -- Add a new <ul> inside the last <li>.
         Just x  -> [Olist { isOpen = True, start = start, items = items' }]
           where items' = (init xs) .+ ((init $ last xs) .+ ulist)
@@ -238,7 +240,7 @@ nextOlist start xs s = case s of
                                , items = (items $ last $ last xs)
                                   .+ [Para { isOpen = True, elems = parseInline $ last x }]
                                }
-        Nothing -> case Regex.matchRegex olistPattern s' of
+        Nothing -> case Regex.matchRegex olistPatt s' of
           -- Add a new <ol> inside the last <li>.
           Just x  -> [Olist { isOpen = True, start = start, items = items' }]
             where items' = (init xs) .+ ((init $ last xs) .+ olist)
@@ -354,8 +356,8 @@ nextQuote xs s = case s of
            >>= parsePre
            >>= parseUlist
            >>= parseOlist
-      elems' = case Regex.matchRegex quotePattern s of
-        Just x' -> markdown $ parseMarkdown (Markdown xs) $ last x'
+      elems' = case Regex.matchRegex quotePatt s of
+        Just x' -> unMarkdown $ parseMarkdown (Markdown xs) $ last x'
         Nothing -> case last xs of
           Para { elems = elems_, ..} ->
             (init xs) .+ Para { isOpen = True, elems = elems_ ++ nextElems }
@@ -365,12 +367,12 @@ nextQuote xs s = case s of
 -- | Parse string into Markdown elements.
 parseHeading, parseHrule, parsePre, parseUlist, parseOlist, parseQuote, parsePara
   :: String -> Either BlockElem String
-parseHeading = mkParser headingPattern parseHeading_
-parseHrule   = mkParser hrulePattern   parseHrule_
-parsePre     = mkParser prePattern     parsePre_
-parseUlist   = mkParser ulistPattern   parseUlist_
-parseOlist   = mkParser olistPattern   parseOlist_
-parseQuote   = mkParser quotePattern   parseQuote_
+parseHeading = mkParser headingPatt parseHeading_
+parseHrule   = mkParser hrulePatt   parseHrule_
+parsePre     = mkParser prePatt     parsePre_
+parseUlist   = mkParser ulistPatt   parseUlist_
+parseOlist   = mkParser olistPatt   parseOlist_
+parseQuote   = mkParser quotePatt   parseQuote_
 parsePara s  = Left $ Para { isOpen = True, elems = parseInline s }
 
 -- | Use `pattern` and `parser` to make a parse function.
@@ -381,14 +383,14 @@ mkParser pattern parser = \s -> case Regex.matchRegex pattern s of
 
 -- | Regex patterns for Markdown elements.
 -- Note that `<p>` does not need a pattern.
-hrulePattern, headingPattern, prePattern, ulistPattern, olistPattern, quotePattern
+hrulePatt, headingPatt, prePatt, ulistPatt, olistPatt, quotePatt
   :: Regex.Regex
-hrulePattern   = Regex.mkRegex [r|^(\-{3,}|\*{3,}|_{3,}) *$|]  -- [(---|***|___)]
-headingPattern = Regex.mkRegex [r|^(#{1,6}) (.*)|]             -- [(#), (content)]
-prePattern     = Regex.mkRegex [r|^```(.*)|]                   -- [(preLang)]
-ulistPattern   = Regex.mkRegex [r|^(-|\*|\+) (.*)|]            -- [(-|*|+), (content)]
-olistPattern   = Regex.mkRegex [r|^([0-9]+)\. (.*)|]           -- [(number), (content)]
-quotePattern   = Regex.mkRegex [r|^> (.*)|]                    -- [(content)]
+hrulePatt   = Regex.mkRegex [r|^(\-{3,}|\*{3,}|_{3,}) *$|]  -- [(---|***|___)]
+headingPatt = Regex.mkRegex [r|^(#{1,6}) (.*)|]             -- [(#), (content)]
+prePatt     = Regex.mkRegex [r|^```(.*)|]                   -- [(preLang)]
+ulistPatt   = Regex.mkRegex [r|^(-|\*|\+) (.*)|]            -- [(-|*|+), (content)]
+olistPatt   = Regex.mkRegex [r|^([0-9]+)\. (.*)|]           -- [(number), (content)]
+quotePatt   = Regex.mkRegex [r|^> (.*)|]                    -- [(content)]
 
 -- | Parsers for Markdown elements.
 -- Note that `<p>` does not need a parser.
@@ -415,7 +417,7 @@ parseOlist_   result = Olist
   }
 parseQuote_   result = Quote
   { isOpen = True
-  , elems' = markdown $ parseMarkdown (Markdown []) $ head result
+  , elems' = unMarkdown $ parseMarkdown (Markdown []) $ head result
   }
 
 -- | Parse inline
@@ -431,31 +433,37 @@ parseInline s = result
                   >>= parseStrong    -- Should before em
                   >>= parseEm
                   >>= parseDel
+                  >>= parseIns
+                  >>= parseMark
                   >>= parsePlain
 
-parseCode, parseDel, parseStrong, parseEm, parseEmStrong, parseLink, parseImg, parseAutoLink, parseEmoji, parsePlain
+parseCode, parseLink, parseImg, parseAutoLink, parseEm, parseStrong, parseEmStrong, parseDel, parseIns, parseMark, parseEmoji, parsePlain
   :: String -> Either [InlineElem] String
-parseCode     = mkParser codePattern     parseCode_
-parseDel      = mkParser delPattern      parseDel_
-parseStrong   = mkParser strongPattern   parseStrong_
-parseEm       = mkParser emPattern       parseEm_
-parseEmStrong = mkParser emStrongPattern parseEmStrong_
-parseLink     = mkParser linkPattern     parseLink_
-parseImg      = mkParser imgPattern      parseImg_
-parseAutoLink = mkParser autoLinkPattern parseAutoLink_
-parseEmoji    = mkParser emojiPattern    parseEmoji_
+parseCode     = mkParser codePatt     parseCode_
+parseLink     = mkParser linkPatt     parseLink_
+parseImg      = mkParser imgPatt      parseImg_
+parseAutoLink = mkParser autoLinkPatt parseAutoLink_
+parseEm       = mkParser emPatt       parseEm_
+parseStrong   = mkParser strongPatt   parseStrong_
+parseEmStrong = mkParser emStrongPatt parseEmStrong_
+parseDel      = mkParser delPatt      parseDel_
+parseIns      = mkParser insPatt      parseIns_
+parseMark     = mkParser markPatt     parseMark_
+parseEmoji    = mkParser emojiPatt    parseEmoji_
 parsePlain s  = Left [Plain s]
 
-parseCode_, parseDel_, parseStrong_, parseEm_, parseEmStrong_, parseLink_, parseImg_, parseAutoLink_, parseEmoji_
+parseCode_, parseLink_, parseImg_, parseAutoLink_, parseEm_, parseStrong_, parseEmStrong_, parseDel_, parseIns_, parseMark_, parseEmoji_
   :: [String] -> [InlineElem]
 parseCode_     x = parseInline_ x $ Code     { content = x !! 1 }
-parseDel_      x = parseInline_ x $ Del      { content = x !! 1 }
-parseStrong_   x = parseInline_ x $ Strong   { content = x !! 2 ++ x !! 3 }
-parseEm_       x = parseInline_ x $ Em       { content = x !! 2 ++ x !! 3 }
-parseEmStrong_ x = parseInline_ x $ EmStrong { content = x !! 2 ++ x !! 3 }
 parseLink_     x = parseInline_ x $ Link     { content = x !! 1, url = x !! 2 }
 parseImg_      x = parseInline_ x $ Img      { content = x !! 1, url = x !! 2 }
 parseAutoLink_ x = parseInline_ x $ Link     { content = x !! 1, url = x !! 1 }
+parseEm_       x = parseInline_ x $ Em       { content = x !! 2 ++ x !! 3 }
+parseStrong_   x = parseInline_ x $ Strong   { content = x !! 2 ++ x !! 3 }
+parseEmStrong_ x = parseInline_ x $ EmStrong { content = x !! 2 ++ x !! 3 }
+parseDel_      x = parseInline_ x $ Del      { content = x !! 1 }
+parseIns_      x = parseInline_ x $ Ins      { content = x !! 1 }
+parseMark_     x = parseInline_ x $ Mark     { content = x !! 1 }
 parseEmoji_    x = parseInline_ x $ Plain    { content = emoji }
   where name  = x !! 1
         emoji = case Map.lookup name emojiMap of
@@ -465,82 +473,20 @@ parseEmoji_    x = parseInline_ x $ Plain    { content = emoji }
 parseInline_ :: [String] -> InlineElem -> [InlineElem]
 parseInline_ result e = (parseInline $ head result) ++ [e] ++ (parseInline $ last result)
 
-strongPattern, emPattern, emStrongPattern, delPattern, codePattern, linkPattern, imgPattern, autoLinkPattern, emojiPattern
+codePatt, linkPatt, imgPatt, autoLinkPatt, emPatt, strongPatt, emStrongPatt, delPatt, insPatt, markPatt, emojiPatt
   :: Regex.Regex
-strongPattern   = Regex.mkRegex [r|(.*)(\*\*(.+)\*\*|__(.+)__)(.*)|]        -- **...**   | __...__
-emPattern       = Regex.mkRegex [r|(.*)(\*(.+)\*|_(.+)_)(.*)|]              -- *...*     | _..._
-emStrongPattern = Regex.mkRegex [r|(.*)(\*\*\*(.+)\*\*\*|___(.+)___)(.*)|]  -- ***...*** | ___...___
-delPattern      = Regex.mkRegex [r|(.*)~~(.+)~~(.*)|]                       -- ~~...~~
-codePattern     = Regex.mkRegex [r|(.*)`(.+)`(.*)|]                         -- `...`
-linkPattern     = Regex.mkRegex [r|(.*)\[(.*)\]\(([^ ]+)\)(.*)|]            -- [...](...)
-imgPattern      = Regex.mkRegex [r|(.*)!\[(.*)\]\(([^ ]+)\)(.*)|]           -- ![...](...)
-autoLinkPattern = Regex.mkRegex [r|(.*)<([a-z]+:[^ ]+)>(.*)|]               -- <xxx:...>
-emojiPattern    = Regex.mkRegex [r|(.*):([a-z0-9_]+|\+1|-1):(.*)|]          -- :...:
+codePatt     = Regex.mkRegex [r|(.*)`(.+)`(.*)|]                         -- `...`
+linkPatt     = Regex.mkRegex [r|(.*)\[(.*)\]\(([^ ]+)\)(.*)|]            -- [...](...)
+imgPatt      = Regex.mkRegex [r|(.*)!\[(.*)\]\(([^ ]+)\)(.*)|]           -- ![...](...)
+autoLinkPatt = Regex.mkRegex [r|(.*)<([a-z]+:[^ ]+)>(.*)|]               -- <xxx:...>
+emPatt       = Regex.mkRegex [r|(.*)(\*(.+)\*|_(.+)_)(.*)|]              -- *...*     | _..._
+strongPatt   = Regex.mkRegex [r|(.*)(\*\*(.+)\*\*|__(.+)__)(.*)|]        -- **...**   | __...__
+emStrongPatt = Regex.mkRegex [r|(.*)(\*\*\*(.+)\*\*\*|___(.+)___)(.*)|]  -- ***...*** | ___...___
+delPatt      = Regex.mkRegex [r|(.*)~~(.+)~~(.*)|]                       -- ~~...~~
+insPatt      = Regex.mkRegex [r|(.*)\+\+(.+)\+\+(.*)|]                   -- ++...++
+markPatt     = Regex.mkRegex [r|(.*)==(.+)==(.*)|]                       -- ==...==
+emojiPatt    = Regex.mkRegex [r|(.*):([a-z0-9_]+|\+1|-1):(.*)|]          -- :...:
 
 -- | Append element to a list.
 (.+) :: [a] -> a -> [a]
 xs .+ x = xs ++ [x]
-
-#ifdef DEBUG
-
-test_parse :: IO ()
-test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])
-    [ ["```python"]
-    -- , ["```c", "int"]
-    -- , ["```c", "int main () {", "    return 0;", "}", "```"]
-    -- , ["```python", "def f:", "\tpass", "```endpython", "```"]
-    -- , ["```python", "def f:", "\tpass", "```", "something after", "more thing after"]
-    -- , ["# Title", "```python", "# Comment", "def f:", "\tpass", "```", "something after", "## title2"]
-    -- , ["Word1", "Word2", "Word3"]
-    -- , ["text", "text", "- list1", "- list2", "  - indent", "- item next", "text3"]
-    -- , ["Text", "- ul1", "- ul2", "- ul3", "1. ol1", "2. ol2", "1. ol3", "- ul another", "3. ol another"]
-    -- , ["> quote"]
-    -- , [">q"]
-    -- , [">> dq"]
-    -- , [">>dq"]
-    -- , [">"]
-    -- , [">>>"]
-    -- , ["> Quote", "> Quote cont.", "> - List in quote 1", "> - List in quote 2", "1. List", "1. List2"]
-    -- , ["## Title", "# Title2", "```c", "- help", "1. First", "22. Twenty-two", "1.invalie ol", "-invalid ul", "> quote", ">> invalid quote", ">2invalid quote", "``invalid code"]
-    -- , ["- XXX_1"]
-    -- , ["- XXX_2", "  - YYY"]
-    -- , ["- XXX_3", "  yyy"] --
-    -- , ["- XXX_4", "  - YYY", "    ZZZ", "  - ww"]
-    -- , ["- XXX_5", "  yyy", "    - ZZZ"]
-    -- , ["- a", "- b", "- c"]
-    -- , ["- First 1", "- First 2", "- First 3", "", "- Second"]
-    -- , ["- a", "b", "- c"]
-    -- , ["- a", " b'", "- c"]
-    -- , ["- a", "  ```python"]
-    -- , ["- a", "  ```python", "  def", "  1+1", "  ```"]
-    -- , ["- a", "  ```python", "  def", "  1+1", "  ```", "- next item"]
-    -- , ["- a", "  ```python", "  def", "  1+1", "  ```", "  next text"]
-    -- , ["- A", "  - B"]
-    , ["- a", "  - b", "  - c"] --
-    -- , ["- A1", "  BBBB"] --
-    -- , ["- A2", "  CCCC", "- X"] --
-    -- , ["- A", "  - B", "  - C", "D"] --
-    -- , ["- 1", "  - 2", "111"] --
-    -- , ["- 1", "  - 2", "111", "- x"] --
-    -- , ["- 1", "  - 2", "  222"] --
-    -- , ["- 1", "  - 2", "    333"] --
-    -- , ["- 1", "  - 2", "    - 444"] --
-    -- , ["- 1", "    - 2", "    - 555"] --
-    -- , ["- a", "  - b", "    ccc"]
-    -- , ["- 1", "  1. x", "  1. y"]  -- FIXME: Exception: Prelude.undefined
-    -- , ["*em*"]
-    -- , ["_em_"]
-    -- , ["``not `common`mark`` sadly"]
-    -- , ["[Fudan University](https://www.fudan.edu.cn/)"]  -- FIXME:/
-    -- , ["[Fudan University](www.fudan.edu.cn)"]
-    -- , ["[Fudan University](<https://www.fudan.edu.cn/>)"]
-    -- , ["[text](link)"]
-    -- , ["***ss*** and *s1* and __s2__"]
-    -- , ["~~del~~"]
-    -- , [":apple:"]
-    -- , [":apple: and :+1:"]
-    -- , [":apple: and "]
-    -- , [":+1:, :-1:, are you OK:"]
-    ]
-
-#endif

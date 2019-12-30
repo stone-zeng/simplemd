@@ -54,11 +54,13 @@ inlineToHtml = concatMap inlineElemToHtml
   where
     inlineElemToHtml Plain    {..} = "" ++ htmlSanitize content ++ ""
     inlineElemToHtml Code     {..} = addTag  "code" content
-    inlineElemToHtml Del      {..} = addTag  "del"    $ htmlSanitize content
     inlineElemToHtml Em       {..} = addTag  "em"     $ htmlSanitize content
     inlineElemToHtml Strong   {..} = addTag  "strong" $ htmlSanitize content
-    inlineElemToHtml EmStrong {..} = addTag  "em" $ addTag "strong" $ htmlSanitize content
-    inlineElemToHtml Link     {..} = addTag' "a" attr               $ htmlSanitize content
+    inlineElemToHtml EmStrong {..} = addTag  "em"     $ addTag "strong" $ htmlSanitize content
+    inlineElemToHtml Del      {..} = addTag  "del"    $ htmlSanitize content
+    inlineElemToHtml Ins      {..} = addTag  "ins"    $ htmlSanitize content
+    inlineElemToHtml Mark     {..} = addTag  "mark"   $ htmlSanitize content
+    inlineElemToHtml Link     {..} = addTag' "a" attr $ htmlSanitize content
       where attr = "href='" ++ url ++ "'"
     inlineElemToHtml Img      {..} = "<img " ++ attr ++ " />"
       where attr = "alt='" ++ content ++ "' src='" ++ url ++ "'"
@@ -75,11 +77,15 @@ addTag' tag attr s = begin ++ s ++ end
   where begin = "<"  ++ tag ++ " " ++ attr ++ ">"
         end   = "</" ++ tag ++ ">"
 
--- | Sanitize `<` and `>` in HTML string.
+-- | Sanitize `<` and `>` in HTML string; replace `(c)`, `(r)`, etc.
 htmlSanitize :: String -> String
 htmlSanitize = mkSanitize
-  [ ([r|\\<|], "&lt;----")
-  , ([r|\\>|], "&gt;++++")
+  [ ([r|\\<|],         "&lt;")
+  , ([r|\\>|],         "&gt;")
+  , ([r|\((c|C)\)|],   "&copy;")
+  , ([r|\((r|R)\)|],   "&reg;")
+  , ([r|\((p|P)\)|],   "&sect;")
+  , ([r|\((tm|TM)\)|], "&trade;")
   ]
 
 mkSanitize :: [(String, String)] -> (String -> String)
