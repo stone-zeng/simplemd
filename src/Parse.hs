@@ -18,8 +18,13 @@ import Text.RawString.QQ
 import Emoji
 
 #ifdef DEBUG
+
 import Debug.Trace
 import Text.Pretty.Simple (pPrint)
+
+myTraceId :: Show a => a -> a
+myTraceId x = trace ("\nDEBUG: <" ++ show x ++ ">\n") x
+
 #endif
 
 -- | Markdown AST.
@@ -31,13 +36,13 @@ instance Show Markdown where
 
 -- | All possible block elements in Markdown.
 data BlockElem =
-    Hrule                                                            -- ^ HTML <hr />
-  | Heading { level :: Int, elems :: [InlineElem] }                  -- ^ HTML <h1>, <h2>, ... <h6>
-  | Para    { isOpen :: Bool, elems :: [InlineElem] }                -- ^ HTML <p>
-  | Pre     { isOpen :: Bool, lang :: String, text :: String }       -- ^ HTML <pre>
+    Hrule                                                          -- ^ HTML <hr />
+  | Heading { level :: Int, elems :: [InlineElem] }                -- ^ HTML <h1>, <h2>, ... <h6>
+  | Para    { isOpen :: Bool, elems :: [InlineElem] }              -- ^ HTML <p>
+  | Pre     { isOpen :: Bool, lang :: String, text :: String }     -- ^ HTML <pre>
   | Ulist   { isOpen :: Bool, items :: [ListItem] }                -- ^ HTML <ul>
   | Olist   { isOpen :: Bool, start :: Int, items :: [ListItem] }  -- ^ HTML <ol>
-  | Quote   { isOpen :: Bool, elems' :: [BlockElem] }                -- ^ HTML <blockquote>
+  | Quote   { isOpen :: Bool, elems' :: [BlockElem] }              -- ^ HTML <blockquote>
   deriving (Eq)
 
 instance Show BlockElem where
@@ -70,7 +75,6 @@ data InlineElem =
   | Link     { content :: String, url :: String }  -- ^ HTML <a href="...">
   | Img      { content :: String, url :: String }  -- ^ HTML <img src="..." alt="...">
   deriving (Eq, Show)
-
 
 parse :: [String] -> Markdown
 parse = foldl parseMarkdown $ Markdown []
@@ -105,7 +109,6 @@ parseMarkdown (Markdown mdElements) s =
       then mdElements
       else mdElements ++ (markdown $ parseMarkdown (Markdown []) s)
 
-
 nextPre :: String -> String -> String -> [BlockElem]
 nextPre preLang preText s = case s of
   "```" -> [Pre { isOpen = False, lang = preLang, text = preText }]
@@ -137,8 +140,8 @@ nextUlist xs s = case s of
       Left block -> closeUlist xs .+ block
       Right _    -> case Regex.matchRegex ulistPattern s of
         -- Add a new <li>.
-        Just x  -> [Ulist { isOpen = True, items = init xs .+ lastItem .+ nextItem }]
-          where lastItem = init $ last xs .+ closeBlockElem (last $ last xs)
+        Just x  -> [Ulist { isOpen = True, items = (init xs) .+ lastItem .+ nextItem }]
+          where lastItem = (init $ last xs) .+ closeBlockElem (last $ last xs)
                 nextItem = [Para { isOpen = True, elems = parseInline $ last x}]
         -- Update the last <li>.
         Nothing -> fallback
@@ -150,26 +153,116 @@ nextUlist xs s = case s of
     (2, s') -> case detectDepth xs of
       0 -> case Regex.matchRegex ulistPattern s' of
         -- Add a new <ul>.
-        Just x  -> [Ulist { isOpen = True, items = init xs .+ (lastItem .+ nextItem) }]
-          where lastItem = (init $ last xs) .+ closeBlockElem (last $ last xs)
-                nextItem = Ulist { isOpen = True, items = items' }
-                items'   = [[Para { isOpen = True, elems = parseInline $ last x }]]
-        Nothing -> fallback
+        Just x  -> [Ulist { isOpen = True, items = items }]
+          where items    = (init xs) .+ (lastItem .+ ulist)
+                lastItem = (init $ last xs) .+ closeBlockElem (last $ last xs)
+                ulist    = Ulist { isOpen = True
+                                 , items  = [[ Para { isOpen = True
+                                                    , elems  = parseInline $ last x
+                                                    } ]]
+                                 }
+        Nothing -> case Regex.matchRegex olistPattern s' of
+          -- Add a new <ol>.
+          Just x  -> [Ulist { isOpen = True, items = items }]
+            where items    = (init xs) .+ (lastItem .+ olist)
+                  lastItem = (init $ last xs) .+ closeBlockElem (last $ last xs)
+                  olist    = Olist { isOpen = True
+                                   , start  = read $ head x
+                                   , items  = [[ Para { isOpen = True
+                                                      , elems  = parseInline $ last x
+                                                      } ]]
+                                   }
+          Nothing -> fallback
       1 -> case Regex.matchRegex ulistPattern s' of
-        -- Add a new <ul>.
-        Just x  -> [Ulist { isOpen = True, items = init xs .+ (lastItem .+ nextItem) }]
-          where lastItem = init $ last xs
-                nextItem = Ulist { isOpen = True, items = (items $ last $ last xs) .+ items' }
-                items'   = [Para { isOpen = True, elems = parseInline $ last x }]
-        Nothing -> fallback
+        -- Add a new <ul> inside the last <li>.
+        Just x  -> [Ulist { isOpen = True, items = items' }]
+          where items' = (init xs) .+ ((init $ last xs) .+ ulist)
+                ulist  = Ulist { isOpen = True
+                               , items = (items $ last $ last xs)
+                                  .+ [Para { isOpen = True, elems = parseInline $ last x }]
+                               }
+        Nothing -> case Regex.matchRegex olistPattern s' of
+          -- Add a new <ol> inside the last <li>.
+          Just x  -> [Ulist { isOpen = True, items = items' }]
+            where items' = (init xs) .+ ((init $ last xs) .+ olist)
+                  olist  = Olist { isOpen = True
+                                 , start = 1  -- FIXME: use correct number
+                                 , items = (items $ last $ last xs)
+                                    .+ [Para { isOpen = True, elems = parseInline $ last x }]
+                                 }
+          Nothing -> fallback
       _ -> fallback
     _ -> fallback
     where fallback = [updateUlist Ulist { isOpen = True, items = xs } $ "\n" ++ s]
 
 nextOlist :: Int -> [ListItem] -> String -> [BlockElem]
-nextOlist = undefined
+nextOlist start0 xs s = case s of
+  -- An empty line will close <ol>.
+  "" -> closeOlist start0 xs
+  _  -> case detectIndent s of
+    -- No indent afterwards.
+    -- If `s` begins with `x. ...`, then append a new <li>; otherwise close the <ol>.
+    (0, _) -> case result of
+      -- Other objects will close <ol>.
+      Left block -> closeOlist start0 xs .+ block
+      Right _    -> case Regex.matchRegex olistPattern s of
+        -- Add a new <li>, do not change `start`.
+        Just x  -> [Olist { isOpen = True, start = start0, items = (init xs) .+ lastItem .+ nextItem }]
+          where lastItem = (init $ last xs) .+ closeBlockElem (last $ last xs)
+                nextItem = [Para { isOpen = True, elems = parseInline $ last x}]
+        -- Update the last <li>.
+        Nothing -> fallback
+      where result = parseHeading s
+                 >>= parseHrule
+                 >>= parsePre
+                 >>= parseUlist
+                 >>= parseQuote
+    (2, s') -> case detectDepth xs of
+      0 -> case Regex.matchRegex ulistPattern s' of
+        -- Add a new <ul>.
+        Just x  -> [Olist { isOpen = True, start = start0, items = items }]
+          where items    = (init xs) .+ (lastItem .+ ulist)
+                lastItem = (init $ last xs) .+ closeBlockElem (last $ last xs)
+                ulist    = Ulist { isOpen = True
+                                 , items  = [[ Para { isOpen = True
+                                                    , elems  = parseInline $ last x
+                                                    } ]]
+                                 }
+        Nothing -> case Regex.matchRegex olistPattern s' of
+          -- Add a new <ol>.
+          Just x  -> [Olist { isOpen = True, start = start0, items = items }]
+            where items    = (init xs) .+ (lastItem .+ olist)
+                  lastItem = (init $ last xs) .+ closeBlockElem (last $ last xs)
+                  olist    = Olist { isOpen = True
+                                   , start  = read $ head x
+                                   , items  = [[ Para { isOpen = True
+                                                      , elems  = parseInline $ last x
+                                                      } ]]
+                                   }
+          Nothing -> fallback
+      1 -> case Regex.matchRegex ulistPattern s' of
+        -- Add a new <ul> inside the last <li>.
+        Just x  -> [Olist { isOpen = True, start = start0, items = items' }]
+          where items' = (init xs) .+ ((init $ last xs) .+ ulist)
+                ulist  = Ulist { isOpen = True
+                               , items = (items $ last $ last xs)
+                                  .+ [Para { isOpen = True, elems = parseInline $ last x }]
+                               }
+        Nothing -> case Regex.matchRegex olistPattern s' of
+          -- Add a new <ol> inside the last <li>.
+          Just x  -> [Olist { isOpen = True, start = start0, items = items' }]
+            where items' = (init xs) .+ ((init $ last xs) .+ olist)
+                  olist  = Olist { isOpen = True
+                                 , start = 1  -- FIXME: use correct number
+                                 , items = (items $ last $ last xs)
+                                    .+ [Para { isOpen = True, elems = parseInline $ last x }]
+                                 }
+          Nothing -> fallback
+      _ -> fallback
+    _ -> fallback
+    where fallback = [updateOlist Olist { isOpen = True, start = start0, items = xs } $ "\n" ++ s]
 
--- | Update the deepest element in a <ul>.
+-- | Update the deepest element in a <ul>/<ol>.
 -- Examples:
 --
 -- updateUlist (Ulist { isOpen = True, items = [[Para { isOpen = True, elems = parseInline "text" }]]}) "extra"
@@ -191,21 +284,42 @@ nextOlist = undefined
 updateUlist :: BlockElem -> String -> BlockElem
 updateUlist Ulist { isOpen = True, .. } s =
   Ulist { isOpen = True, items = initItems .+ lastItem' }
-    where initItems  = init items
-          lastItem   = last items
-          initItems' = init lastItem
-          lastItem'  = case last lastItem of
-                Para  { isOpen = True, .. } ->
-                  initItems' .+ Para { isOpen = True, elems = elems ++ parseInline s }
-                Ulist { isOpen = True, items = _ } ->
-                  initItems' .+ updateUlist (last lastItem) s
-                _ -> undefined
+    where initItems = init items
+          lastItem  = last items
+          lastItem' = (init lastItem) .+ case last lastItem of
+            Para  { isOpen = True, .. } ->
+              Para { isOpen = True, elems = elems ++ parseInline s }
+            Ulist { isOpen = True, items = _ } ->
+              updateUlist (last lastItem) s
+            Olist { isOpen = True, items = _, .. } ->
+              updateOlist (last lastItem) s
+            _ -> undefined
 updateUlist _ _ = undefined
 
--- | Close <ul>, as well as the last <p> element inside this <ul>.
+updateOlist :: BlockElem -> String -> BlockElem
+updateOlist Olist { isOpen = True, .. } s =
+  Olist { isOpen = True, start = start, items = initItems .+ lastItem' }
+    where initItems = init items
+          lastItem  = last items
+          lastItem' = (init lastItem) .+ case last lastItem of
+            Para  { isOpen = True, .. } ->
+              Para { isOpen = True, elems = elems ++ parseInline s }
+            Ulist { isOpen = True, items = _ } ->
+              updateUlist (last lastItem) s
+            Olist { isOpen = True, items = _, start = _ } ->
+              updateOlist (last lastItem) s
+            _ -> undefined
+updateOlist _ _ = undefined
+
+-- | Close <ul>/<ol>, as well as the last <p> element inside this <ul>/<ol>.
 closeUlist :: [ListItem] -> [BlockElem]
-closeUlist xs = [Ulist { isOpen = False, items = init xs .+ lastItem }]
-  where lastItem  = init $ last xs .+ lastItem'
+closeUlist xs = [Ulist { isOpen = False, items = (init xs) .+ lastItem }]
+  where lastItem  = (init $ last xs) .+ lastItem'
+        lastItem' = closeBlockElem (last $ last xs)
+
+closeOlist :: Int -> [ListItem] -> [BlockElem]
+closeOlist start xs = [Olist { isOpen = False, start = start, items = (init xs) .+ lastItem }]
+  where lastItem  = (init $ last xs) .+ lastItem'
         lastItem' = closeBlockElem (last $ last xs)
 
 -- | Return the number of leading spaces and the sub-string with leading spaces removed.
@@ -356,11 +470,7 @@ emojiPattern    = Regex.mkRegex [r|(.*):([a-z0-9_]+|\+1|-1):(.*)|]          -- :
 (.+) :: [a] -> a -> [a]
 xs .+ x = xs ++ [x]
 
-
 #ifdef DEBUG
-
-myTraceId :: Show a => a -> a
-myTraceId x = trace ("\nDEBUG: <" ++ show x ++ ">\n") x
 
 test_parse :: IO ()
 test_parse = pPrint $ map (foldl parseMarkdown $ Markdown [])

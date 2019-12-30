@@ -133,7 +133,7 @@ h2 {
 
 .md-output ol,
 .md-output ul {
-  padding-left: 1em;
+  padding-left: 2em;
 }
 
 .md-output blockquote {
@@ -141,4 +141,8 @@ h2 {
   padding-left: 1em;
   margin: 0;
   border-left: .25em solid #dfe2e5;
+}
+
+.md-output img {
+  max-width: 80%;
 }
