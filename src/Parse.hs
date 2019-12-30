@@ -74,6 +74,8 @@ data InlineElem =
   | Del      { content :: String }                 -- ^ HTML <del>
   | Ins      { content :: String }                 -- ^ HTML <ins>
   | Mark     { content :: String }                 -- ^ HTML <mark>
+  | Sup      { content :: String }                 -- ^ HTML <sup>
+  | Sub      { content :: String }                 -- ^ HTML <sub>
   | Link     { content :: String, url :: String }  -- ^ HTML <a href="...">
   | Img      { content :: String, url :: String }  -- ^ HTML <img src="..." alt="...">
   deriving (Eq, Show)
@@ -365,8 +367,13 @@ nextQuote xs s = case s of
       nextElems = parseInline $ "\n" ++ s
 
 -- | Parse string into Markdown elements.
-parseHeading, parseHrule, parsePre, parseUlist, parseOlist, parseQuote, parsePara
-  :: String -> Either BlockElem String
+parseHeading
+  , parseHrule
+  , parsePre
+  , parseUlist
+  , parseOlist
+  , parseQuote
+  , parsePara :: String -> Either BlockElem String
 parseHeading = mkParser headingPatt parseHeading_
 parseHrule   = mkParser hrulePatt   parseHrule_
 parsePre     = mkParser prePatt     parsePre_
@@ -383,8 +390,12 @@ mkParser pattern parser = \s -> case Regex.matchRegex pattern s of
 
 -- | Regex patterns for Markdown elements.
 -- Note that `<p>` does not need a pattern.
-hrulePatt, headingPatt, prePatt, ulistPatt, olistPatt, quotePatt
-  :: Regex.Regex
+hrulePatt
+  , headingPatt
+  , prePatt
+  , ulistPatt
+  , olistPatt
+  , quotePatt :: Regex.Regex
 hrulePatt   = Regex.mkRegex [r|^(\-{3,}|\*{3,}|_{3,}) *$|]  -- [(---|***|___)]
 headingPatt = Regex.mkRegex [r|^(#{1,6}) (.*)|]             -- [(#), (content)]
 prePatt     = Regex.mkRegex [r|^```(.*)|]                   -- [(preLang)]
@@ -394,31 +405,24 @@ quotePatt   = Regex.mkRegex [r|^> (.*)|]                    -- [(content)]
 
 -- | Parsers for Markdown elements.
 -- Note that `<p>` does not need a parser.
-parseHrule_, parseHeading_, parsePre_, parseUlist_, parseOlist_, parseQuote_
-   :: [String] -> BlockElem
-parseHeading_ result = Heading
-  { level = length $ head result
-  , elems = parseInline $ last result
-  }
-parseHrule_   _      = Hrule
-parsePre_     result = Pre
+parseHeading_
+  , parseHrule_
+  , parsePre_
+  , parseUlist_
+  , parseOlist_
+  , parseQuote_ :: [String] -> BlockElem
+parseHeading_ x = Heading { level = length $ head x , elems = parseInline $ last x }
+parseHrule_ _ = Hrule
+parsePre_ x = Pre { isOpen = True, lang = head x, text = "" }
+parseUlist_ x = Ulist
+  { isOpen = True, items  = [[Para { isOpen = True, elems = parseInline $ last x }]] }
+parseOlist_ x = Olist
   { isOpen = True
-  , lang = head result
-  , text = ""
+  , start  = read $ head x
+  , items  = [[Para { isOpen = True, elems = parseInline $ last x }]]
   }
-parseUlist_   result = Ulist
-  { isOpen = True
-  , items  = [[Para { isOpen = True, elems = parseInline $ last result }]]
-  }
-parseOlist_   result = Olist
-  { isOpen = True
-  , start  = read $ head result
-  , items  = [[Para { isOpen = True, elems = parseInline $ last result }]]
-  }
-parseQuote_   result = Quote
-  { isOpen = True
-  , elems' = unMarkdown $ parseMarkdown (Markdown []) $ head result
-  }
+parseQuote_ x = Quote { isOpen = True, elems' = unMarkdown $ parseMarkdown (Markdown []) $ head x }
+
 
 -- | Parse inline
 parseInline :: String -> [InlineElem]
@@ -432,13 +436,27 @@ parseInline s = result
                   >>= parseEmStrong  -- Should before strong and em
                   >>= parseStrong    -- Should before em
                   >>= parseEm
-                  >>= parseDel
+                  >>= parseDel       -- Should before <sub>
                   >>= parseIns
                   >>= parseMark
+                  >>= parseSup
+                  >>= parseSub
                   >>= parsePlain
 
-parseCode, parseLink, parseImg, parseAutoLink, parseEm, parseStrong, parseEmStrong, parseDel, parseIns, parseMark, parseEmoji, parsePlain
-  :: String -> Either [InlineElem] String
+parseCode
+  , parseLink
+  , parseImg
+  , parseAutoLink
+  , parseEm
+  , parseStrong
+  , parseEmStrong
+  , parseDel
+  , parseIns
+  , parseMark
+  , parseSup
+  , parseSub
+  , parseEmoji
+  , parsePlain :: String -> Either [InlineElem] String
 parseCode     = mkParser codePatt     parseCode_
 parseLink     = mkParser linkPatt     parseLink_
 parseImg      = mkParser imgPatt      parseImg_
@@ -449,11 +467,24 @@ parseEmStrong = mkParser emStrongPatt parseEmStrong_
 parseDel      = mkParser delPatt      parseDel_
 parseIns      = mkParser insPatt      parseIns_
 parseMark     = mkParser markPatt     parseMark_
+parseSup      = mkParser supPatt      parseSup_
+parseSub      = mkParser subPatt      parseSub_
 parseEmoji    = mkParser emojiPatt    parseEmoji_
 parsePlain s  = Left [Plain s]
 
-parseCode_, parseLink_, parseImg_, parseAutoLink_, parseEm_, parseStrong_, parseEmStrong_, parseDel_, parseIns_, parseMark_, parseEmoji_
-  :: [String] -> [InlineElem]
+parseCode_
+  , parseLink_
+  , parseImg_
+  , parseAutoLink_
+  , parseEm_
+  , parseStrong_
+  , parseEmStrong_
+  , parseDel_
+  , parseIns_
+  , parseMark_
+  , parseSup_
+  , parseSub_
+  , parseEmoji_ :: [String] -> [InlineElem]
 parseCode_     x = parseInline_ x $ Code     { content = x !! 1 }
 parseLink_     x = parseInline_ x $ Link     { content = x !! 1, url = x !! 2 }
 parseImg_      x = parseInline_ x $ Img      { content = x !! 1, url = x !! 2 }
@@ -464,6 +495,8 @@ parseEmStrong_ x = parseInline_ x $ EmStrong { content = x !! 2 ++ x !! 3 }
 parseDel_      x = parseInline_ x $ Del      { content = x !! 1 }
 parseIns_      x = parseInline_ x $ Ins      { content = x !! 1 }
 parseMark_     x = parseInline_ x $ Mark     { content = x !! 1 }
+parseSup_      x = parseInline_ x $ Sup      { content = x !! 1 }
+parseSub_      x = parseInline_ x $ Sub      { content = x !! 1 }
 parseEmoji_    x = parseInline_ x $ Plain    { content = emoji }
   where name  = x !! 1
         emoji = case Map.lookup name emojiMap of
@@ -473,8 +506,19 @@ parseEmoji_    x = parseInline_ x $ Plain    { content = emoji }
 parseInline_ :: [String] -> InlineElem -> [InlineElem]
 parseInline_ result e = (parseInline $ head result) ++ [e] ++ (parseInline $ last result)
 
-codePatt, linkPatt, imgPatt, autoLinkPatt, emPatt, strongPatt, emStrongPatt, delPatt, insPatt, markPatt, emojiPatt
-  :: Regex.Regex
+codePatt
+  , linkPatt
+  , imgPatt
+  , autoLinkPatt
+  , emPatt
+  , strongPatt
+  , emStrongPatt
+  , delPatt
+  , insPatt
+  , markPatt
+  , supPatt
+  , subPatt
+  , emojiPatt :: Regex.Regex
 codePatt     = Regex.mkRegex [r|(.*)`(.+)`(.*)|]                         -- `...`
 linkPatt     = Regex.mkRegex [r|(.*)\[(.*)\]\(([^ ]+)\)(.*)|]            -- [...](...)
 imgPatt      = Regex.mkRegex [r|(.*)!\[(.*)\]\(([^ ]+)\)(.*)|]           -- ![...](...)
@@ -485,6 +529,8 @@ emStrongPatt = Regex.mkRegex [r|(.*)(\*\*\*(.+)\*\*\*|___(.+)___)(.*)|]  -- ***.
 delPatt      = Regex.mkRegex [r|(.*)~~(.+)~~(.*)|]                       -- ~~...~~
 insPatt      = Regex.mkRegex [r|(.*)\+\+(.+)\+\+(.*)|]                   -- ++...++
 markPatt     = Regex.mkRegex [r|(.*)==(.+)==(.*)|]                       -- ==...==
+supPatt      = Regex.mkRegex [r|(.*)\^(.+)\^(.*)|]                       -- ^...^
+subPatt      = Regex.mkRegex [r|(.*)~(.+)~(.*)|]                         -- ~...~
 emojiPatt    = Regex.mkRegex [r|(.*):([a-z0-9_]+|\+1|-1):(.*)|]          -- :...:
 
 -- | Append element to a list.

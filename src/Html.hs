@@ -60,6 +60,8 @@ inlineToHtml = concatMap inlineElemToHtml
     inlineElemToHtml Del      {..} = addTag  "del"    $ htmlSanitize content
     inlineElemToHtml Ins      {..} = addTag  "ins"    $ htmlSanitize content
     inlineElemToHtml Mark     {..} = addTag  "mark"   $ htmlSanitize content
+    inlineElemToHtml Sup      {..} = addTag  "sup"    $ htmlSanitize content
+    inlineElemToHtml Sub      {..} = addTag  "sub"    $ htmlSanitize content
     inlineElemToHtml Link     {..} = addTag' "a" attr $ htmlSanitize content
       where attr = "href='" ++ url ++ "'"
     inlineElemToHtml Img      {..} = "<img " ++ attr ++ " />"
@@ -86,6 +88,7 @@ htmlSanitize = mkSanitize
   , ([r|\((r|R)\)|],   "&reg;")
   , ([r|\((p|P)\)|],   "&sect;")
   , ([r|\((tm|TM)\)|], "&trade;")
+  , ([r|"(.*)"|],      "&ldquo;\\1&rdquo;")
   ]
 
 mkSanitize :: [(String, String)] -> (String -> String)
