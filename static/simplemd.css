@@ -136,6 +136,11 @@ h2 {
   padding-left: 2em;
 }
 
+.md-output ol ol,
+.md-output ul ol {
+  list-style: lower-alpha;
+}
+
 .md-output blockquote {
   color: #6a737d;
   padding-left: 1em;
@@ -145,4 +150,26 @@ h2 {
 
 .md-output img {
   max-width: 80%;
+}
+
+.md-output table {
+  display: block;
+  width: 100%;
+  overflow: auto;
+  border-collapse: collapse;
+}
+
+.md-output table tr:nth-child(2n) {
+  background-color: #f6f8fa;
+}
+
+.md-output table td,
+.md-output table th {
+  padding: 6px 13px;
+  border: 1px solid #dfe2e5;
+  border-collapse: collapse;
+}
+
+.md-output table th {
+  font-weight: 600;
 }
