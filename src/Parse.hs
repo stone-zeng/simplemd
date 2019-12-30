@@ -529,8 +529,8 @@ emStrongPatt = Regex.mkRegex [r|(.*)(\*\*\*(.+)\*\*\*|___(.+)___)(.*)|]  -- ***.
 delPatt      = Regex.mkRegex [r|(.*)~~(.+)~~(.*)|]                       -- ~~...~~
 insPatt      = Regex.mkRegex [r|(.*)\+\+(.+)\+\+(.*)|]                   -- ++...++
 markPatt     = Regex.mkRegex [r|(.*)==(.+)==(.*)|]                       -- ==...==
-supPatt      = Regex.mkRegex [r|(.*)\^(.+)\^(.*)|]                       -- ^...^
-subPatt      = Regex.mkRegex [r|(.*)~(.+)~(.*)|]                         -- ~...~
+supPatt      = Regex.mkRegex [r|(.*)\^([a-zA-Z0-9_+\-]+)\^(.*)|]         -- ^...^
+subPatt      = Regex.mkRegex [r|(.*)~([a-zA-Z0-9_+\-]+)~(.*)|]           -- ~...~
 emojiPatt    = Regex.mkRegex [r|(.*):([a-z0-9_]+|\+1|-1):(.*)|]          -- :...:
 
 -- | Append element to a list.

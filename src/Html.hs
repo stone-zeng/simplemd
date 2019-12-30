@@ -80,17 +80,24 @@ addTag' tag attr s = begin ++ s ++ end
         end   = "</" ++ tag ++ ">"
 
 -- | Sanitize `<` and `>` in HTML string; replace `(c)`, `(r)`, etc.
+-- Priority of the rules decreases from top to bottom.
 htmlSanitize :: String -> String
-htmlSanitize = mkSanitize
-  [ ([r|\\<|],         "&lt;")
-  , ([r|\\>|],         "&gt;")
-  , ([r|\((c|C)\)|],   "&copy;")
-  , ([r|\((r|R)\)|],   "&reg;")
-  , ([r|\((p|P)\)|],   "&sect;")
-  , ([r|\((tm|TM)\)|], "&trade;")
-  , ([r|"(.*)"|],      "&ldquo;\\1&rdquo;")
+htmlSanitize = mkSanitize $ reverse
+  [ -- HTML escape
+    ([r|\\<|],                   "&lt;")
+  , ([r|\\>|],                   "&gt;")
+  -- Typographic replacements
+  , ([r|\((c|C)\)|],             "&copy;")
+  , ([r|\((r|R)\)|],             "&reg;")
+  , ([r|\((p|P)\)|],             "&sect;")
+  , ([r|\((tm|TM)\)|],           "&trade;")
+  , ([r|---|],                   "&mdash;")
+  , ([r|--|],                    "&ndash;")
+  , ([r|([a-zA-Z])'([a-zA-Z])|], [r|\1&rsquo;\2|])
+  , ([r|'([^']*)'|],             [r|&lsquo;\1&rsquo;|])
+  , ([r|"([^"]*)"|],             [r|&ldquo;\1&rdquo;|])  -- See https://codereview.stackexchange.com/a/77177
   ]
 
 mkSanitize :: [(String, String)] -> (String -> String)
-mkSanitize subList = foldr (.) id (map mkSub subList)
+mkSanitize subList = foldl (.) id (map mkSub subList)
   where mkSub (pattern, replace) = \x -> Regex.subRegex (Regex.mkRegex pattern) x replace
