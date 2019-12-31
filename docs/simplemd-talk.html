@@ -7,8 +7,20 @@
     <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js"></script>
     <style>
-      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
-
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,400i,700,700i);
+      @page {
+        size: 908px 681px;
+        margin: 0;
+      }
+      @media print {
+        .remark-slide-scaler {
+          width: 100% !important;
+          height: 100% !important;
+          transform: scale(1) !important;
+          top: 0 !important;
+          left: 0 !important;
+        }
+      }
       body {
         font-family: 'Avenir Next', 'Source Han Sans SC', sans-serif;
       }
@@ -87,9 +99,6 @@
       }
       .small ul {
         font-size: 17.5px;
-      }
-      .small .remark-code {
-        font-size: 78%;
       }
       .icon {
         fill: currentColor;
@@ -424,9 +433,9 @@ body {
 
 ---
 
-class: center, middle
+## Demo
 
-# Show time
+<p><img src="demo.png" alt="SimpleMD demo" style="width: 100%;"></p>
 
 ---
 
@@ -438,7 +447,7 @@ class: center, middle
   - Only `<ul>`/`<ol>` are allowed inside `<ul>`/`<ol>`
   - Rules for `<em>`, `<strong>`, `<a>`, etc. are not complete
 - Syntax for extended features may clash with normal text:
-  - E.g. `:` for emoji, `$` for Math formulas
+  - E.g. `:` for emoji, `$` for Math formulas, `<`/`>` for HTML tags
 - Some special characters may break regex matching
 - Not support other HTML event (e.g. `onload`, `onpaste`)
 ]
@@ -448,47 +457,11 @@ class: center, middle
 
 .list-todo[
 - Support more rules:
-  - Indent code block, more generic nest list
+  - Indent code block, more generic nested list
   - Auto-detected URL
-  - Tables, footnotes, etc.
+  - Tables, footnotes, toc, etc.
 - Real-time highlight for input
 - Support conversion to LaTeX, reStructuredText, etc.
-]
-
----
-
-## Statistics
-
-.left-column[
-- Xiangdong Zeng:
-  - Main structure, block parser
-  - `4,220 ++  3,132 --`
-]
-
-.right-column[
-- Xuyang Duan
-  - Inline parser, code review
-  - `1,620 ++  78 --`
-]
-
---
-
-.small[
-```sh
-$ cloc .
-
-github.com/AlDanial/cloc v 1.84  T=0.03 s (373.1 files/s, 93597.2 lines/s)
---------------------------------------------------------------------------
-Language                   files         blank       comment          code
---------------------------------------------------------------------------
-Haskell                        8            94            73          2198
-HTML                           2           100            11           456
-CSS                            1            28             0           147
-Markdown                       1             1             0             2
---------------------------------------------------------------------------
-SUM:                          12           223            84          2803
---------------------------------------------------------------------------
-```
 ]
 
 ---
