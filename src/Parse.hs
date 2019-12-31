@@ -36,13 +36,13 @@ instance Show Markdown where
 
 -- | All possible block elements in Markdown.
 data BlockElem =
-    Hrule                                                          -- ^ HTML <hr />
-  | Heading { level :: Int, elems :: [InlineElem] }                -- ^ HTML <h1>, <h2>, ... <h6>
-  | Para    { isOpen :: Bool, elems :: [InlineElem] }              -- ^ HTML <p>
-  | Pre     { isOpen :: Bool, lang :: String, text :: String }     -- ^ HTML <pre>
-  | Ulist   { isOpen :: Bool, items :: [ListItem] }                -- ^ HTML <ul>
-  | Olist   { isOpen :: Bool, start :: Int, items :: [ListItem] }  -- ^ HTML <ol>
-  | Quote   { isOpen :: Bool, elems' :: [BlockElem] }              -- ^ HTML <blockquote>
+    Hrule                                                           -- ^ HTML <hr />
+  | Heading { level  :: Int,  elems  :: [InlineElem] }              -- ^ HTML <h1>, <h2>, ... <h6>
+  | Para    { isOpen :: Bool, elems  :: [InlineElem] }              -- ^ HTML <p>
+  | Pre     { isOpen :: Bool, lang   :: String, text :: String }    -- ^ HTML <pre>
+  | Ulist   { isOpen :: Bool, items  :: [ListItem] }                -- ^ HTML <ul>
+  | Olist   { isOpen :: Bool, start  :: Int, items :: [ListItem] }  -- ^ HTML <ol>
+  | Quote   { isOpen :: Bool, elems' :: [BlockElem] }               -- ^ HTML <blockquote>
   deriving (Eq)
 
 instance Show BlockElem where

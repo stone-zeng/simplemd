@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SimpleMD - A simple Markdown editor, written in Haskell</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/contrib/auto-render.min.js"></script>
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body {
+        font-family: 'Avenir Next', 'Source Han Sans SC', sans-serif;
+      }
+      h1, h2, h3 {
+        font-weight: 600;
+      }
+      h2 {
+        margin-top: 16px;
+        margin-bottom: 16px;
+      }
+      .remark-slide-content h3 {
+        font-size: 32px;
+      }
+      a {
+        color: #db83ed;
+        text-decoration: none;
+      }
+      .remark-slide-content {
+        font-size: 24px;
+      }
+      .remark-slide-number {
+        font-size: 20px;
+      }
+      .remark-code, .remark-inline-code {
+        font-family: 'Ubuntu Mono';
+        line-height: 22px;
+      }
+      .remark-code {
+        font-size: 20px;
+      }
+      .remark-inline-code {
+        font-size: 90%;
+        background-color: rgba(235,228,243,0.25);
+        border-radius: 6px;
+      }
+      .remark-code, .hljs-arta .hljs {
+        color: #e0e0e0;
+        background-color: #21152b;
+      }
+      .hljs-arta .hljs-comment {
+        color: #757575;
+      }
+      .hljs-arta .hljs-quote {
+        color: #e0e0e0;
+      }
+      .remark-inline-code {
+        padding: .2ex .2em;
+      }
+      .bg-red {
+        background-color: #3d1d54;
+      }
+      .bg-dark {
+        color: white;
+        text-shadow: 0 0 20px #333;
+      }
+      .left-column { 
+        width: 49%;
+        float: left;
+      }
+      .right-column {
+        width: 49%;
+        float: right;
+      }
+      .list-issues > ul, .list-todo > ul {
+        list-style-type: none;
+      }
+      .list-issues > ul > li:before {
+        content: '\2639';
+        margin-left: -20px;
+        margin-right: 10px;
+      }
+      .list-todo > ul > li:before {
+        content: '\263A';
+        margin-left: -20px;
+        margin-right: 10px;
+      }
+      .small ul {
+        font-size: 17.5px;
+      }
+      .small .remark-code {
+        font-size: 78%;
+      }
+      .icon {
+        fill: currentColor;
+        vertical-align: middle;
+        display: inline-block;
+      }
+      .footnote {
+        opacity: .5;
+        font-size: 16px;
+        position: absolute;
+        bottom: 20px;
+        left: 30px;
+      }
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+layout: true
+class: bg-red, bg-dark
+
+---
+
+class: center, middle
+
+# SimpleMD
+
+### A simple Markdown editor, written in Haskell
+
+Xiangdong Zeng & Xuyang Duan
+
+December 31, 2019 @ Fudan University
+
+---
+
+## Introduction
+
+### What&rsquo;s Markdown?
+
+Markdown is a **lightweight markup language** that you can use to add formatting elements to plaintext text documents.
+
+--
+
+### What&rsquo;s SimpleMD?
+
+- A simple Markdown parser and editor
+- Written in Haskell
+- Based on web technology
+- Support some extend features
+
+---
+
+## Markdown syntax
+
+.left-column[
+```markdown
+<!-- Heading -->
+# H1
+## H2
+### H3
+
+<!-- Ordered list -->
+1. First item
+2. Second item
+3. Third item
+
+<!-- Unordered list -->
+- First item
+- Second item
+  - Third item
+
+<!-- Blockquote -->
+> Blockquote
+>
+> - With items
+
+<!-- Horizontal rule -->
+___
+```
+]
+
+.right-column[
+````markdown
+<!-- Fenced code block -->
+```c
+int main() {
+  printf("Hello, world!\n");
+  return 0;
+}
+```
+
+<!-- Inline text semantics -->
+**Bold**, *italicized* and
+~~deleted~~ text.
+
+<!-- Link -->
+[title](https://www.example.com)
+
+<!-- Image -->
+![alt text](image.jpg)
+
+<!-- HTML blocks -->
+<table>
+  <tr><td>Hello</td></tr>
+</table>
+````
+]
+
+---
+
+## Extended features
+
+- Super-/subscripts:
+  - `19^th^ H~2~O`<br/>
+  - 19<sup>th</sup> H<sub>2</sub>O
+- Highlight elements:
+  - `==Highlight== and ++inserted++ text`<br/>
+  - <mark>Highlight</mark> and <ins>inserted</ins> text
+- Math formulas (via KaTeX):
+  - `$\sin^2\theta+\cos^2\theta=1$`<br/>
+  - \\(\sin^2\theta+\cos^2\theta=1\\)
+- Emoji:
+  - `:smiley: :family_man_woman_girl_boy: :tada: :cn:`<br/>
+  - &#x1f603; &#x1f468;&#x200d;&#x1f469;&#x200d;&#x1f467;&#x200d;&#x1f466; &#x1f389; &#x1f1e8;&#x1f1f3;
+---
+
+## Program structure
+
+- Draw the initial page, via `Threepenny-GUI` library
+--
+
+- Get value of the input text
+--
+
+- Parse input string into Markdown AST:
+  - Split lines
+  - Parse block elements: paragraph, code block, ordered/unordered list, blockquote, etc.
+  - Parse inline elements: strong & emphasis, inline code, link, emoji, etc.
+--
+
+- Convert Markdown AST into HTML:
+  - Add tags and attributes
+  - Sanitize and add typographic replacements (quotation marks, dashes, etc.)
+--
+
+- Put the HTML string on web page with a pretty style sheet
+  - Load JavaScript code for Math rendering & syntax highlight
+
+---
+
+## File structure
+
+```
+./
+ ├─ simplemd.cabal
+ ├─ Setup.hs
+ ├─ src/
+ │    Main.hs                   -- Entry point of program
+ │     ╚═ Gui.hs                -- Draw the GUI, via Threepenny-GUI library
+ │         ╠═ Svg.hs            -- Draw SVG icons
+ │         ╚═ Html.hs           -- Transform Markdown AST into HTML
+ │             ╚═ Parse.hs      -- Markdown parser (core of the program)
+ │                 ╚═ Emoji.hs  -- Emoji database
+ │
+ └─ static/
+      index.html                -- Web page for the editor
+      simplemd.css              -- Style sheet
+```
+
+---
+
+## Markdown AST
+
+```haskell
+newtype Markdown = Markdown { unMarkdown :: [BlockElem] }
+  deriving (Eq)
+
+data BlockElem =
+    Hrule
+  | Heading { level  :: Int,  elems  :: [InlineElem] }
+  | Para    { isOpen :: Bool, elems  :: [InlineElem] }
+  | Pre     { isOpen :: Bool, lang   :: String, text :: String }
+  | Ulist   { isOpen :: Bool, items  :: [ListItem] }
+  | Olist   { isOpen :: Bool, items  :: [ListItem], start :: Int }
+  | Quote   { isOpen :: Bool, elems' :: [BlockElem] }  -- Recursive
+  deriving (Eq)
+
+data InlineElem =
+    Plain    { content :: String }
+  | Code     { content :: String }
+  | Em       { content :: String }
+  | Link     { content :: String, url :: String }
+  ...
+  deriving (Eq, Show)
+```
+
+---
+
+## Parser (monadic & recursive)
+
+```haskell
+parse :: [String] -> Markdown
+parse = foldl parseMarkdown $ Markdown []
+
+parseMarkdown :: Markdown -> String -> Markdown
+parseMarkdown (Markdown []) s = Markdown [result]
+  where Left result = parseHeading s
+                  >>= parseHrule >>= ...
+parseMarkdown (Markdown mdElements) s =
+  case last mdElements of
+    Pre { isOpen = True, .. } ->
+      Markdown $ init mdElements ++ nextPre lang text s
+    ...
+    _ -> Markdown $ if null s
+      then mdElements
+      else mdElements ++ (unMarkdown $ parseMarkdown (Markdown []) s)
+
+parseInline :: String -> [InlineElem]
+parseInline "" = []
+parseInline s = result
+  where Left result = parseCode s
+                  >>= parseEmoji >>= ...
+```
+
+---
+
+## Regular expression
+
+```haskell
+{-# LANGUAGE QuasiQuotes #-}
+import qualified Text.Regex as Regex
+import Text.RawString.QQ
+
+parseHeading :: String -> Either BlockElem String
+parseHeading = mkParser headingPatt parseHeading_
+
+mkParser :: Regex.Regex -> ([String] -> a)
+                        -> (String -> Either a String)
+mkParser pattern parser = \s -> case Regex.matchRegex pattern s of
+  Just x  -> Left $ parser x
+  Nothing -> Right s
+
+headingPatt :: Regex.Regex
+headingPatt = Regex.mkRegex [r|^(#{1,6}) (.*)|]  -- (#...#), (content)
+```
+
+---
+
+## Emoji
+
+```haskell
+-- Parse.hs
+parseEmoji_ :: [String] -> [InlineElem]
+parseEmoji_ x = parseInline_ x $ Plain { content = emoji }
+  where name  = x !! 1
+        emoji = case Map.lookup name emojiMap of
+          Just y  -> y
+          Nothing -> ":" ++ name ++ ":"
+```
+
+```haskell
+-- Emoji.hs
+import qualified Data.Map as Map
+
+emojiMap :: Map.Map String String
+emojiMap = Map.fromList [ ("-1",   "&amp;#x1f44e;")
+                        , ("+1",   "&amp;#x1f44d;")
+                        , ("100",  "&amp;#x1f4af;")
+                        , ("1234", "&amp;#x1f522;")
+                        , ...
+                        , ("zzz",  "&amp;#x1f4a4;")
+                        ]  -- Data from https://api.github.com/emojis
+```
+
+---
+
+## GUI
+
+```haskell
+import Graphics.UI.Threepenny ((#), (#.), (#+))
+import qualified Graphics.UI.Threepenny as UI
+
+gui :: UI.Window -> UI.UI ()
+gui window = void $ do
+  return window # UI.set UI.title "SimpleMD"
+
+  title <- UI.h1
+    # UI.set UI.text "Welcome to SimpleMD!"
+
+  -- More elements
+
+  UI.on UI.valueChange mdInput $ \_ -> do
+    markdownText <- UI.get UI.value mdInput
+    UI.element mdOutput
+      # UI.set html (markdownToHtml markdownText)
+    UI.runFunction $ UI.ffi jsCode  -- Load some JavaScript code
+
+html :: UI.Attr UI.Element String
+html = UI.mkReadWriteAttr get set
+  where get   el = UI.callFunction $ UI.ffi "$(%1).html()" el
+        set v el = UI.runFunction  $ UI.ffi "$(%1).html(%2)" el v
+```
+
+---
+
+## HTML & CSS
+
+```html
+<!doctype html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" type="text/css" href="static/simplemd.css" />
+  <script src="haskell.js"></script>
+  <!-- More CSS and JavaScript code -->
+  <script type="text/javascript" charset="utf-8">
+    Haskell.initFFI();
+  </script>
+</head>
+<body></body>
+</html>
+```
+
+```css
+body {
+  font: 400 16px/1.6 'Avenir Next', 'Source Han Sans SC', sans-serif;
+  font-feature-settings: 'kern';
+  font-kerning: normal;
+  word-wrap: break-word;
+}
+...
+```
+
+---
+
+class: center, middle
+
+# Show time
+
+---
+
+## Known issues & TODO
+
+.list-issues[
+- Not fully supprt CommonMark Spec:
+  - Only support 2-level `<ul>`/`<ol>`
+  - Only `<ul>`/`<ol>` are allowed inside `<ul>`/`<ol>`
+  - Rules for `<em>`, `<strong>`, `<a>`, etc. are not complete
+- Syntax for extended features may clash with normal text:
+  - E.g. `:` for emoji, `$` for Math formulas
+- Some special characters may break regex matching
+- Not support other HTML event (e.g. `onload`, `onpaste`)
+]
+
+<p></p>
+--
+
+.list-todo[
+- Support more rules:
+  - Indent code block, more generic nest list
+  - Auto-detected URL
+  - Tables, footnotes, etc.
+- Real-time highlight for input
+- Support conversion to LaTeX, reStructuredText, etc.
+]
+
+---
+
+## Statistics
+
+.left-column[
+- Xiangdong Zeng:
+  - Main structure, block parser
+  - `4,220 ++  3,132 --`
+]
+
+.right-column[
+- Xuyang Duan
+  - Inline parser, code review
+  - `1,620 ++  78 --`
+]
+
+--
+
+.small[
+```sh
+$ cloc .
+
+github.com/AlDanial/cloc v 1.84  T=0.03 s (373.1 files/s, 93597.2 lines/s)
+--------------------------------------------------------------------------
+Language                   files         blank       comment          code
+--------------------------------------------------------------------------
+Haskell                        8            94            73          2198
+HTML                           2           100            11           456
+CSS                            1            28             0           147
+Markdown                       1             1             0             2
+--------------------------------------------------------------------------
+SUM:                          12           223            84          2803
+--------------------------------------------------------------------------
+```
+]
+
+---
+
+class: small
+
+## References
+
+- John Gruber. Markdown
+  - <https://daringfireball.net/projects/markdown>
+- CommonMark Spec, version 0.29
+  - <https://spec.commonmark.org/0.29>
+- GitHub. Basic writing and formatting syntax
+  - <https://help.github.com/en/github/writing-on-github/basic-writing-and-formatting-syntax>
+- Dillinger - Online Markdown editor
+  - <https://dillinger.io>
+- `markdown-it` - Markdown parser, done right
+  - <https://github.com/markdown-it/markdown-it>
+- `threepenny-gui` - GUI framework that uses the web browser as a display
+  - <https://hackage.haskell.org/package/threepenny-gui>
+- `regex-compat-tdfa` - Unicode support version of `Text.Regex`, using `regex-tdfa`
+  - <https://hackage.haskell.org/package/regex-compat-tdfa>
+- KaTeX - The fastest math typesetting library for the web
+  - <https://katex.org>
+- `highlight.js` - Javascript syntax highlighter
+  - <https://highlightjs.org>
+
+---
+
+class: center, middle
+
+# Thank you!
+
+[<svg height="24" class="icon" viewBox="0 0 16 16" version="1.1" width="24" aria-hidden="true"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg> stone-zeng/simplemd](https://github.com/stone-zeng/simplemd)
+
+.footnote[Slideshow created using [remark](https://github.com/gnab/remark).]
+
+    </textarea>
+    <script src="https://remarkjs.com/downloads/remark-latest.min.js">
+    </script>
+    <script>
+      var options = {};
+      var renderMath = function() {
+        renderMathInElement(document.body);
+      }
+      var slideshow = remark.create(
+        {
+          highlightStyle: 'arta',
+          countIncrementalSlides: false
+        },
+        renderMath
+      );
+    </script>
+  </body>
+</html>
